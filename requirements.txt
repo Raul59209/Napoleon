@@ -1,0 +1,48 @@
+# STT Benchmark — Python dependencies
+# Install with: pip install -r requirements.txt
+#
+# ── GPU setup (run this FIRST on Windows with NVIDIA GPU) ──────────────────
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+#
+# ── Model availability on a local NVIDIA PC ────────────────────────────────
+#   Voxtral          → Mistral API (no local GPU needed, just MISTRAL_API_KEY)
+#   Whisper large-v3 → local GPU, ~3 GB VRAM
+#   faster-whisper   → local GPU, ~3 GB VRAM (faster than above)
+#   WhisperX         → local GPU, ~3 GB VRAM + ~1 GB for alignment model
+#   NVIDIA Conformer → local GPU, ~2 GB VRAM (NeMo, see note below)
+
+# ── Voxtral (Mistral API) ───────────────────────────────────────────────────
+#mistralai>=1.2.0           # Official Mistral Python SDK
+#python-dotenv>=1.0.0       # Load MISTRAL_API_KEY from .env
+
+# ── Whisper family ─────────────────────────────────────────────────────────
+openai-whisper>=20231117
+faster-whisper>=1.0.0
+whisperx>=3.1.1
+
+# ── NVIDIA NeMo (for Conformer-CTC) ────────────────────────────────────────
+# NeMo has heavy deps — install separately to avoid conflicts:
+#   pip install nemo_toolkit[asr]
+# Or use the lighter standalone:
+#   pip install nemo_toolkit
+
+# ── Metrics ────────────────────────────────────────────────────────────────
+jiwer>=3.0.3               # WER + CER
+transformers>=4.54.0       # VoxtralForConditionalGeneration + tokenizers
+
+# ── Text normalization ─────────────────────────────────────────────────────
+num2words>=0.5.13          # French number words → digits
+
+# ── Audio ──────────────────────────────────────────────────────────────────
+torchaudio>=2.0.0
+soundfile>=0.12.1
+librosa>=0.10.0
+
+# ── Data / notebooks ───────────────────────────────────────────────────────
+pandas>=2.0.0
+numpy>=1.24.0
+jupyter>=1.0.0
+ipykernel>=6.25.0
+
+# ── Utilities ──────────────────────────────────────────────────────────────
+tqdm>=4.66.0
