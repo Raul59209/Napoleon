@@ -44,37 +44,7 @@ stt_benchmark/
 
 ## Quickstart
 
-### Option A — Docker (recommended for sharing with your team)
-
-Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) with the NVIDIA Container Toolkit enabled.
-
-```bash
-# 1. Build the image
-docker build -t stt-benchmark .
-
-# 2. Run interactively with GPU + mounted volumes (Windows)
-docker run --gpus all -it --rm ^
-  -v "%cd%/audio":/app/audio ^
-  -v "%cd%/dataset":/app/dataset ^
-  -v "%cd%/results":/app/results ^
-  --env-file .env ^
-  stt-benchmark
-
-# Or with docker compose (handles volumes + GPU automatically):
-docker compose run benchmark
-
-# 3. Inside the container, run scripts normally:
-python prep_ground_truth.py --audio_dir ./audio --output_dir ./dataset
-```
-
-> **Sharing with your boss:** just send the whole project folder (excluding `audio/`, `dataset/`, `results/`, and `.env`). They run `docker build` + `docker compose run benchmark` and get an identical environment.
-
----
-
-### Option B — Local install
-
-**⚠️ RTX 5060 / Blackwell GPU owners:** PyTorch stable does not support Blackwell yet.
-Use the nightly build with CUDA 12.8:
+Local install
 
 ```bash
 pip uninstall torch torchvision torchaudio -y
