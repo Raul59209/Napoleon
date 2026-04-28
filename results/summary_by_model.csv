@@ -1,0 +1,4 @@
+model,wer_mean,wer_median,cer_mean,cer_median,med_entity_acc_mean,med_entity_acc_median,med_entity_hits_mean,med_entity_hits_median,med_entity_total_mean,med_entity_total_median,latency_s_mean,latency_s_median,rtf_mean,rtf_median,cost_usd_mean,cost_usd_median,cost_per_hour_audio_mean,cost_per_hour_audio_median,n_critical_errors,n_segments
+faster-whisper-large-v3,0.0316,0.0316,0.0184,0.0184,1.0,1.0,2.0,2.0,2.0,2.0,119.217,119.217,1.127,1.127,0.0,0.0,0.0,0.0,0,1
+whisper-large-v3,0.0447,0.0447,0.0295,0.0295,1.0,1.0,2.0,2.0,2.0,2.0,103.447,103.447,0.978,0.978,0.0,0.0,0.0,0.0,0,1
+whisperx-large-v3,1.0,1.0,0.9974,0.9974,0.0,0.0,0.0,0.0,2.0,2.0,-1.0,-1.0,-0.009,-0.009,0.0,0.0,0.0,0.0,0,1
