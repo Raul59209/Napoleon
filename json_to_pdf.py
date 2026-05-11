@@ -3,7 +3,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, VA_TOP
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
 import json
 import sys
 from pathlib import Path
@@ -84,24 +84,24 @@ def create_consultation_pdf(json_file, output_pdf=None):
     if medicaux:
         med_text = ', '.join(medicaux) if isinstance(medicaux, list) else str(medicaux)
         content_data.append([
-            [Paragraph("<b>Antécédents médicaux</b>", normal_style)],
-            [Paragraph(med_text, normal_style)]
+            Paragraph("<b>Antécédents médicaux</b>", normal_style),
+            Paragraph(med_text, normal_style)
         ])
     
     chirurgicaux = antecedents.get('chirurgicaux', [])
     if chirurgicaux:
         chir_text = ', '.join(chirurgicaux) if isinstance(chirurgicaux, list) else str(chirurgicaux)
         content_data.append([
-            [Paragraph("<b>Antécédents chirurgicaux</b>", normal_style)],
-            [Paragraph(chir_text, normal_style)]
+            Paragraph("<b>Antécédents chirurgicaux</b>", normal_style),
+            Paragraph(chir_text, normal_style)
         ])
     
     familiaux = antecedents.get('familiaux', [])
     if familiaux:
         fam_text = ', '.join(familiaux) if isinstance(familiaux, list) else str(familiaux)
         content_data.append([
-            [Paragraph("<b>Antécédents familiaux</b>", normal_style)],
-            [Paragraph(fam_text, normal_style)]
+            Paragraph("<b>Antécédents familiaux</b>", normal_style),
+            Paragraph(fam_text, normal_style)
         ])
     
     # Mode de vie
@@ -120,8 +120,8 @@ def create_consultation_pdf(json_file, output_pdf=None):
         if mode_text_parts:
             mode_text = ' ; '.join(mode_text_parts)
             content_data.append([
-                [Paragraph("<b>Mode de vie</b>", normal_style)],
-                [Paragraph(mode_text, normal_style)]
+                Paragraph("<b>Mode de vie</b>", normal_style),
+                Paragraph(mode_text, normal_style)
             ])
     
     # Traitements habituels
@@ -142,8 +142,8 @@ def create_consultation_pdf(json_file, output_pdf=None):
         if trait_text_parts:
             trait_text = ' ; '.join(trait_text_parts)
             content_data.append([
-                [Paragraph("<b>Traitements habituels</b>", normal_style)],
-                [Paragraph(trait_text, normal_style)]
+                Paragraph("<b>Traitements habituels</b>", normal_style),
+                Paragraph(trait_text, normal_style)
             ])
     
     # Allergies
@@ -155,8 +155,8 @@ def create_consultation_pdf(json_file, output_pdf=None):
     
     if allergy_text:
         content_data.append([
-            [Paragraph("<b>Allergies</b>", normal_style)],
-            [Paragraph(allergy_text, normal_style)]
+            Paragraph("<b>Allergies</b>", normal_style),
+            Paragraph(allergy_text, normal_style)
         ])
     
     # Interrogatoire section
@@ -166,21 +166,21 @@ def create_consultation_pdf(json_file, output_pdf=None):
     
     if interrogatoire.get('symptomes_generaux'):
         content_data.append([
-            [Paragraph("<b>Symptômes généraux</b>", normal_style)],
-            [Paragraph(interrogatoire['symptomes_generaux'], normal_style)]
+            Paragraph("<b>Symptômes généraux</b>", normal_style),
+            Paragraph(interrogatoire['symptomes_generaux'], normal_style)
         ])
     
     if interrogatoire.get('symptomes_par_organe'):
         content_data.append([
-            [Paragraph(f"<b>{interrogatoire.get('organe_specifique', 'Symptômes spécifiques')}</b>", normal_style)],
-            [Paragraph(interrogatoire['symptomes_par_organe'], normal_style)]
+            Paragraph(f"<b>{interrogatoire.get('organe_specifique', 'Symptômes spécifiques')}</b>", normal_style),
+            Paragraph(interrogatoire['symptomes_par_organe'], normal_style)
         ])
     
     # Additional interrogatoire details from report
     if report.get('interrogatoire'):
         content_data.append([
-            [Paragraph("<b>Détails additionnels</b>", normal_style)],
-            [Paragraph(report['interrogatoire'], normal_style)]
+            Paragraph("<b>Détails additionnels</b>", normal_style),
+            Paragraph(report['interrogatoire'], normal_style)
         ])
     
     # Examen clinique section
@@ -190,14 +190,14 @@ def create_consultation_pdf(json_file, output_pdf=None):
     
     if examen.get('examen_specifique'):
         content_data.append([
-            [Paragraph("<b>Selon spécialité (ORL)</b>", normal_style)],
-            [Paragraph(examen['examen_specifique'], normal_style)]
+            Paragraph("<b>Selon spécialité (ORL)</b>", normal_style),
+            Paragraph(examen['examen_specifique'], normal_style)
         ])
     
     if report.get('examen_clinique'):
         content_data.append([
-            [Paragraph("<b>Observations</b>", normal_style)],
-            [Paragraph(report['examen_clinique'], normal_style)]
+            Paragraph("<b>Observations</b>", normal_style),
+            Paragraph(report['examen_clinique'], normal_style)
         ])
     
     # Conclusion section
@@ -207,20 +207,20 @@ def create_consultation_pdf(json_file, output_pdf=None):
         
         if conclusion.get('diagnostic'):
             content_data.append([
-                [Paragraph("<b>Diagnostic</b>", normal_style)],
-                [Paragraph(conclusion['diagnostic'], normal_style)]
+                Paragraph("<b>Diagnostic</b>", normal_style),
+                Paragraph(conclusion['diagnostic'], normal_style)
             ])
         
         if conclusion.get('proposition_therapeutique'):
             content_data.append([
-                [Paragraph("<b>Proposition thérapeutique</b>", normal_style)],
-                [Paragraph(conclusion['proposition_therapeutique'], normal_style)]
+                Paragraph("<b>Proposition thérapeutique</b>", normal_style),
+                Paragraph(conclusion['proposition_therapeutique'], normal_style)
             ])
         
         if report.get('proposition_therapeutique'):
             content_data.append([
-                [Paragraph("<b>Traitement recommandé</b>", normal_style)],
-                [Paragraph(report['proposition_therapeutique'], normal_style)]
+                Paragraph("<b>Traitement recommandé</b>", normal_style),
+                Paragraph(report['proposition_therapeutique'], normal_style)
             ])
         
         if conclusion.get('examens_complementaires'):
@@ -228,14 +228,14 @@ def create_consultation_pdf(json_file, output_pdf=None):
             if examens_list:
                 examens_text = ', '.join(examens_list) if isinstance(examens_list, list) else str(examens_list)
                 content_data.append([
-                    [Paragraph("<b>Examens complémentaires</b>", normal_style)],
-                    [Paragraph(examens_text, normal_style)]
+                    Paragraph("<b>Examens complémentaires</b>", normal_style),
+                    Paragraph(examens_text, normal_style)
                 ])
         
         if conclusion.get('orientation'):
             content_data.append([
-                [Paragraph("<b>Orientation</b>", normal_style)],
-                [Paragraph(conclusion['orientation'], normal_style)]
+                Paragraph("<b>Orientation</b>", normal_style),
+                Paragraph(conclusion['orientation'], normal_style)
             ])
     
     # Prochaine consultation
@@ -243,50 +243,46 @@ def create_consultation_pdf(json_file, output_pdf=None):
         content_data.append([Paragraph("<b>Prochaine consultation</b>", header_style)])
         content_data.append([Paragraph(conclusion['prochaine_consultation'], normal_style)])
     
-    # Create styled table
-    # Create table with proper structure
+    # Create table data with proper structure
     table_data = []
     for row in content_data:
-        if len(row) == 1 and isinstance(row[0], Paragraph):
-            # Header rows - full width
-            table_data.append([row[0]])
-        elif len(row) == 2 and isinstance(row[0], list) and isinstance(row[1], list):
-            # Two-column rows
-            table_data.append([row[0][0], row[1][0]])
+        if len(row) == 1:
+            # Full-width rows (headers)
+            table_data.append([row[0], ''])
         else:
-            # Single cell rows
+            # Two-column rows
             table_data.append(row)
     
     # Create main table
     main_table = Table(table_data, colWidths=[2*inch, 4*inch])
-    main_table.setStyle(TableStyle([
-        # Header styling (gray background, bold text)
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808080')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 11),
+    
+    # Build style commands
+    style_commands = [
+        # General styling
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), VA_TOP),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')]),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
-    ]))
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')]),
+    ]
     
     # Apply header styling to section headers
-    row_idx = 0
     for i, row in enumerate(content_data):
-        if len(row) == 1 and isinstance(row[0], Paragraph):
-            main_table.setStyle(TableStyle([
+        if len(row) == 1:
+            # This is a header row
+            style_commands.extend([
                 ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#808080')),
                 ('TEXTCOLOR', (0, i), (-1, i), colors.black),
                 ('FONTNAME', (0, i), (-1, i), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, i), (-1, i), 11),
                 ('SPAN', (0, i), (-1, i)),
-            ]), start=i, end=i+1)
+            ])
     
+    main_table.setStyle(TableStyle(style_commands))
     story.append(main_table)
     
     # Build PDF
