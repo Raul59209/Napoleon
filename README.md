@@ -1,24 +1,33 @@
-# Napoleon - Convertisseur JSON vers PDF
+# Napoleon - Pipeline complet de traitement audio médical
 
-Convertisseur de consultations médicales JSON en rapports PDF professionnels avec mise en page de qualité médicale.
+Pipeline complet pour convertir de l'audio médical en rapports PDF professionnels. Du traitement audio brut à l'extraction de consultations et génération de PDF.
 
-## Fonctionnalités
+## Flux global
 
-- Conversion de fichiers JSON d'extraction de consultations en PDF formatés
-- Mise en page professionnelle avec tableau à deux colonnes
-- En-têtes gris avec texte gras pour les sections
-- Support complet du français (accents, caractères spéciaux)
-- Gestion flexible des données manquantes
-- Traitement par lot possible
+```
+Audio (.mp3, .wav)
+    ↓
+[Docker STT Models] (Whisper, faster-whisper, WhisperX, Voxtral, Nvidia Conformer)
+    ↓
+Transcription JSON
+    ↓
+[Extraction d'informations] (LLM - ChatGPT, Claude, etc.)
+    ↓
+extraction_consultation_XXXX.json
+    ↓
+[json_to_pdf.py]
+    ↓
+Rapport PDF professionnel
+```
+
+## Prérequis
+
+- Docker et Docker Compose
+- GPU NVIDIA (RTX 3000+ recommandé, 8GB+ VRAM)
+- Au moins 50GB d'espace disque (pour les modèles)
+- Git
 
 ## Installation
-
-### Prérequis
-
-- Python 3.7+
-- pip
-
-### Étapes
 
 1. Clonez le repository:
 ```bash
@@ -26,253 +35,342 @@ git clone https://github.com/Raul59209/Napoleon.git
 cd Napoleon
 ```
 
-2. Créez un environnement virtuel (optionnel mais recommandé):
+2. Créez les dossiers nécessaires:
 ```bash
-python -m venv venv
-source venv/bin/activate  # Sur Windows: venv\Scripts\activate
+mkdir -p audio dataset results transcriptions
 ```
 
-3. Installez reportlab:
+3. Placez vos fichiers audio dans le dossier `audio/`:
+```bash
+cp /chemin/vers/vos/fichiers.mp3 audio/
+```
+
+## Étape 1 : Construire l'image Docker
+
+```bash
+docker compose build
+```
+
+Cette étape télécharge et prépare les modèles STT (plusieurs minutes, selon votre connexion internet).
+
+## Étape 2 : Transcrire l'audio avec STT
+
+Choisissez un modèle et exécutez:
+
+### Option A : Whisper Large V3 (recommandé - équilibre qualité/vitesse)
+
+```bash
+docker compose run whisper-large
+```
+
+Durée estimée: 15-30 minutes pour 2-3 heures d'audio
+
+### Option B : Faster-Whisper (plus rapide, légèrement moins précis)
+
+```bash
+docker compose run faster-whisper
+```
+
+Durée estimée: 10-15 minutes pour 2-3 heures d'audio
+
+### Option C : WhisperX (avec alignement forcé)
+
+```bash
+docker compose run whisperx
+```
+
+Durée estimée: 20-40 minutes pour 2-3 heures d'audio
+
+### Option D : Voxtral Mini (très rapide, français optimisé)
+
+```bash
+docker compose run voxtral
+```
+
+Durée estimée: 5-15 minutes pour 2-3 heures d'audio (GPU permitting)
+
+Pour éviter les erreurs de mémoire GPU sur Voxtral:
+
+```bash
+# Ajouter dans docker-compose.yml pour le service voxtral:
+environment:
+  CUDA_VISIBLE_DEVICES: 0
+  VOXTRAL_TORCH_DTYPE: float16
+```
+
+### Option E : NVIDIA Conformer (très précis mais lent)
+
+```bash
+docker compose run nvidia-conformer
+```
+
+Durée estimée: 45+ minutes pour 2-3 heures d'audio
+
+Après l'exécution, les transcriptions se trouvent dans `results/transcription_XXXX.json`.
+
+## Étape 3 : Extraire les données de consultation
+
+Une fois la transcription complétée, utilisez un LLM pour extraire les informations structurées:
+
+### Avec OpenAI ChatGPT (recommandé)
+
+```bash
+export OPENAI_API_KEY="votre_clé_api"
+python extract_consultation.py --transcription results/transcription_XXXX.json --output results/extraction_consultation_XXXX.json
+```
+
+### Avec Anthropic Claude
+
+```bash
+export ANTHROPIC_API_KEY="votre_clé_api"
+python extract_consultation.py --provider anthropic --transcription results/transcription_XXXX.json --output results/extraction_consultation_XXXX.json
+```
+
+### Avec un modèle local (Ollama)
+
+```bash
+# Démarrer Ollama au préalable
+ollama serve
+
+# Dans un autre terminal:
+python extract_consultation.py --provider ollama --model llama2-french --transcription results/transcription_XXXX.json --output results/extraction_consultation_XXXX.json
+```
+
+La sortie est un fichier `extraction_consultation_XXXX.json` contenant:
+- Motif de consultation
+- Historique médical
+- Antécédents
+- Interrogatoire
+- Examen clinique
+- Conclusion et diagnostic
+- Prescriptions
+
+## Étape 4 : Convertir en PDF
+
+Installez reportlab:
+
 ```bash
 pip install reportlab
 ```
 
-## Utilisation
-
-### Utilisation simple
+Convertissez le fichier d'extraction en PDF professionnel:
 
 ```bash
-python json_to_pdf.py results/extraction_consultation_1001.json
+python json_to_pdf.py results/extraction_consultation_XXXX.json
 ```
 
-Cela génère un PDF: `extraction_consultation_1001.pdf`
+Sortie: `extraction_consultation_XXXX.pdf`
 
-### Spécifier le fichier de sortie
+Pour spécifier un nom personnalisé:
 
 ```bash
-python json_to_pdf.py results/extraction_consultation_1001.json mon_rapport.pdf
+python json_to_pdf.py results/extraction_consultation_XXXX.json rapport_patient_dupont.pdf
 ```
 
-### Traitement par lot
+## Flux complet en une ligne (exemple)
 
 ```bash
-# Convertir tous les fichiers JSON du dossier results
-for file in results/extraction_consultation*.json; do
-    python json_to_pdf.py "$file"
-done
+# 1. Construire
+docker compose build
+
+# 2. Transcrire
+docker compose run whisper-large
+
+# 3. Extraire (supposant extract_consultation.py existe)
+export OPENAI_API_KEY="sk-..."
+python extract_consultation.py --transcription results/transcription_XXXX.json --output results/extraction_consultation_XXXX.json
+
+# 4. Générer PDF
+python json_to_pdf.py results/extraction_consultation_XXXX.json
 ```
 
-## Format JSON d'entrée
+## Structure des fichiers
 
-Le script accepte des fichiers JSON avec la structure suivante:
+```
+Napoleon/
+├── audio/                              # Fichiers audio d'entrée
+│   ├── consultation_1.mp3
+│   ├── consultation_2.wav
+│   └── ...
+├── results/                            # Résultats intermédiaires et finaux
+│   ├── transcription_1001.json        # Sortie STT (étape 2)
+│   ├── extraction_consultation_1001.json  # Sortie LLM (étape 3)
+│   └── extraction_consultation_1001.pdf   # PDF final (étape 4)
+├── dataset/                            # Dataset et corrections humaines
+├── transcriptions/                     # Transcriptions temporaires
+├── docker-compose.yml                  # Configuration Docker
+├── json_to_pdf.py                      # Script de conversion JSON->PDF
+├── extract_consultation.py             # Script d'extraction LLM (si présent)
+├── Dockerfile                          # Construction Docker
+└── README.md                           # Documentation
+```
+
+## Format de sortie JSON (étape 3)
 
 ```json
 {
   "consultation_report": {
-    "motif_de_consultation": "Description du motif",
-    "interrogatoire": "Détails de l'interrogatoire",
-    "examen_clinique": "Résultats de l'examen",
-    "proposition_therapeutique": "Plan de traitement"
+    "motif_de_consultation": "Suivi du diabète et hypertension",
+    "interrogatoire": "Le patient rapporte...",
+    "examen_clinique": "La tension artérielle est à 148/86 mmHg...",
+    "proposition_therapeutique": "Ajout d'Indapamide 1,25 mg..."
   },
   "medical_record": {
-    "motif_de_consultation": "Motif principal",
-    "historique_medical": "Antécédents généraux",
+    "motif_de_consultation": "Diabète, hypertension",
+    "historique_medical": "Diabète depuis 10 ans...",
     "antecedents": {
-      "medicaux": ["Liste des antécédents médicaux"],
-      "chirurgicaux": ["Liste des interventions"],
-      "familiaux": ["Antécédents familiaux"],
+      "medicaux": ["Diabète", "Hypertension", "Cholestérol"],
+      "chirurgicaux": [],
+      "familiaux": ["Crise cardiaque du père"],
       "gynecologiques": []
     },
     "mode_de_vie": {
-      "tabac": "Statut tabagique",
-      "alcool": "Consommation d'alcool",
-      "activite_physique": "Description",
-      "autre": "Informations supplémentaires"
+      "tabac": "Arrêté il y a 20 ans",
+      "alcool": "Modéré",
+      "activite_physique": "Marche 30 min/jour",
+      "autre": "Retraité"
     },
     "traitements_habituels": [
       {
-        "nom_commercial": "Nom du médicament",
-        "molecule": "Molécule active",
-        "posologie": "Dosage et fréquence"
+        "nom_commercial": "Metformine",
+        "molecule": "Metformine",
+        "posologie": "1000 mg matin et soir"
       }
     ],
-    "allergies": ["Liste des allergies"],
+    "allergies": ["Pas d'allergies connues"],
     "interrogatoire": {
-      "symptomes_generaux": "Description",
-      "symptomes_par_organe": "Description"
+      "symptomes_generaux": "Asthénie légère",
+      "symptomes_par_organe": "Œdèmes aux chevilles"
     },
     "examen_clinique": {
       "constantes": {
-        "poids_kg": null,
-        "taille_cm": null,
-        "tension_arterielle": "mmHg"
+        "poids_kg": 75,
+        "tension_arterielle": "148/86"
       },
-      "examen_specifique": "Détails de l'examen"
+      "examen_specifique": "ECG recommandé"
     },
     "conclusion": {
-      "diagnostic": "Diagnostic établi",
-      "proposition_therapeutique": "Traitement proposé",
-      "examens_complementaires": ["Liste des examens"],
-      "orientation": "Orientations cliniques",
-      "prochaine_consultation": "Date/délai de suivi"
+      "diagnostic": "Hypertension, diabète mal contrôlé",
+      "proposition_therapeutique": "Optimisation du traitement",
+      "examens_complementaires": ["ECG", "Bilan sanguin"],
+      "orientation": "Suivi cardiologique",
+      "prochaine_consultation": "Dans 3 semaines"
     }
   },
   "prescription": {
     "prescriptions": [
       {
-        "nom_commercial": "Nom du médicament",
-        "molecule": "Molécule",
-        "dosage": "Dosage",
+        "nom_commercial": "INDAPAMIDE",
+        "molecule": "indapamide",
+        "dosage": "1,25 mg",
         "posologie": {
-          "dose": "Dose",
-          "frequence": "Fréquence",
-          "voie": "Voie d'administration"
-        },
-        "instructions_complementaires": "Notes additionnelles"
+          "dose": "1,25 mg",
+          "frequence": "le matin",
+          "voie": "orale"
+        }
       }
     ]
   }
 }
 ```
 
-## Format PDF de sortie
+## Format de sortie PDF (étape 4)
 
-Le PDF généré comprend les sections suivantes:
+Le PDF contient:
 
-1. **Motif de consultation** - Raison principale de la visite
-2. **Historique médical**
-   - Antécédents (médicaux, chirurgicaux, familiaux)
-   - Mode de vie (tabac, alcool, activité physique)
-   - Traitements habituels
-   - Allergies
-3. **Interrogatoire** - Symptômes et plaintes du patient
-4. **Examen clinique** - Findings de l'examen physique
-5. **Conclusion**
-   - Diagnostic
-   - Proposition thérapeutique
-   - Examens complémentaires recommandés
-   - Orientation du patient
-   - Date de la prochaine consultation
-
-## Exemples
-
-### Exemple 1 - Conversion simple
-
-```bash
-python json_to_pdf.py results/extraction_consultation_1001.json
-```
-
-Génère: `extraction_consultation_1001.pdf`
-
-### Exemple 2 - Conversion avec nom personnalisé
-
-```bash
-python json_to_pdf.py results/extraction_consultation_1001.json rapport_patient_dupont.pdf
-```
-
-### Exemple 3 - Conversion de plusieurs fichiers
-
-```bash
-python json_to_pdf.py results/extraction_consultation_1001.json
-python json_to_pdf.py results/extraction_consultation_1003.json
-python json_to_pdf.py results/extraction_consultation_1006.json
-```
+- En-têtes gris avec titres de section
+- Tableau à deux colonnes (Champ | Valeur)
+- Sections organisées: Motif, Historique, Interrogatoire, Examen, Conclusion
+- Mise en page professionnelle adaptée à la médecine
+- Support complet du français
 
 ## Dépannage
 
+### Erreur Docker: "out of memory"
+
+Solution 1 (Voxtral):
+```bash
+# Dans docker-compose.yml, ajouter pour le service voxtral:
+environment:
+  CUDA_VISIBLE_DEVICES: 0
+  TORCH_DTYPE: float16
+```
+
+Solution 2 (tous modèles):
+```bash
+docker compose run --memory 16g whisper-large
+```
+
+### Erreur: "CUDA driver error"
+
+```bash
+# Vérifier la GPU
+docker run --rm --gpus all nvidia/cuda:12.1.0-runtime nvidia-smi
+
+# Mettre à jour les drivers NVIDIA
+# https://www.nvidia.com/Download/driverDetails.aspx
+```
+
 ### Erreur: "No module named 'reportlab'"
 
-**Solution:** Installez reportlab
 ```bash
 pip install reportlab
 ```
 
-### Erreur: "File not found"
+### Conteneurs orphelins
 
-**Solution:** Vérifiez le chemin du fichier JSON. Utilisez un chemin absolu si nécessaire:
 ```bash
-python json_to_pdf.py C:\chemin\complet\extraction_consultation_1001.json
+docker compose down --remove-orphans
+docker compose build
+docker compose run whisper-large
 ```
 
-### Le PDF contient des caractères mal affichés
+## Variables d'environnement
 
-**Solution:** Assurez-vous que le fichier JSON est encodé en UTF-8. Reportlab supporte nativement les caractères français.
+```bash
+# Pour l'extraction LLM
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="claude-..."
+export HF_TOKEN="hf_..."
 
-### Le PDF ne contient pas toutes les données
-
-**Solution:** Vérifiez que votre JSON a la structure correcte. Le script ignore silencieusement les champs manquants ou nuls.
-
-## Structure du projet
-
+# Pour Docker STT
+export CUDA_VISIBLE_DEVICES=0  # GPU à utiliser
+export MODEL_CACHE=/path/to/cache  # Cache des modèles
 ```
-Napoleon/
-├── json_to_pdf.py          # Script principal
-├── README.md               # Documentation (ce fichier)
-├── results/                # Dossier des fichiers JSON d'entrée
-│   ├── extraction_consultation_1001.json
-│   ├── extraction_consultation_1003.json
-│   └── ...
-└── .gitignore
-```
+
+## Performance estimée
+
+| Modèle | Vitesse | Qualité | Mémoire | Durée pour 2h audio |
+|--------|---------|---------|---------|-------------------|
+| Whisper Large V3 | Moyenne | Excellente | 8GB | 20-30 min |
+| Faster-Whisper | Rapide | Bonne | 6GB | 10-15 min |
+| WhisperX | Moyenne | Excellente | 10GB | 25-40 min |
+| Voxtral Mini | Très rapide | Très bonne | 4GB | 5-15 min |
+| NVIDIA Conformer | Lent | Excellente | 12GB | 45-60 min |
 
 ## Sécurité des données
 
-Ce script traite des données médicales sensibles. Recommandations:
+Ce pipeline traite des données médicales sensibles:
 
-- Utilisez des chemins de fichiers sécurisés
-- Limitez l'accès aux fichiers de sortie PDF
-- Nettoyez les fichiers temporaires après génération
-- Respectez les réglementations RGPD sur les données patients
+- Chiffrez vos fichiers audio
+- Limitez l'accès aux fichiers de sortie
+- Utilisez des clés API sécurisées (.env)
+- Supprimez les fichiers après traitement
+- Respectez RGPD et les régulations médicales locales
 
-## Configuration avancée
-
-### Modifier les couleurs
-
-Dans `json_to_pdf.py`, ligne ~55, modifiez les codes couleur HEX:
-
-```python
-colors.HexColor('#808080')   # En-têtes gris
-colors.HexColor('#2e5c8a')   # Bleu personnalisé
-colors.HexColor('#f0f0f0')   # Arrière-plan des lignes
+Exemple de fichier `.env`:
+```bash
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=claude-...
+CUDA_VISIBLE_DEVICES=0
 ```
 
-### Modifier la taille de police
+## Support et contributes
 
-Recherchez `fontSize=` dans le fichier et ajustez les valeurs:
-
-```python
-fontSize=11   # En-têtes
-fontSize=10   # Contenu normal
-```
-
-### Modifier les dimensions
-
-Les largeurs de colonnes sont définies ligne ~180:
-
-```python
-colWidths=[2*inch, 4*inch]  # Première colonne: 2", Deuxième: 4"
-```
-
-## Cas d'usage
-
-- Génération automatique de rapports médicaux
-- Archivage de consultations en format PDF
-- Distribution de rapports aux patients
-- Intégration dans des workflows médicaux
-- Conversion de données structurées en documents imprimables
-
-## Performance
-
-- Conversion d'un fichier JSON: ~1-2 secondes
-- Fichier PDF généré: ~50-200 KB selon la longueur
-- Pas de limite connue sur la taille des données
-
-## Support
-
-Pour toute question ou problème:
-1. Vérifiez le dépannage ci-dessus
-2. Consultez la structure JSON d'exemple
-3. Testez avec un fichier JSON simple d'abord
+Pour des problèmes:
+1. Consultez le dépannage ci-dessus
+2. Vérifiez les logs: `docker compose logs whisper-large`
+3. Ouvrez une issue sur GitHub
 
 ## Licence
 
