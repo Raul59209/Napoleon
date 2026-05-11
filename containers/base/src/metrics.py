@@ -331,7 +331,7 @@ class BenchmarkMetrics:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    from normalizer import MedicalNormalizer
+    from Napoleon.containers.base.src.normalizer import MedicalNormalizer
     norm = MedicalNormalizer()
     m    = BenchmarkMetrics()
 

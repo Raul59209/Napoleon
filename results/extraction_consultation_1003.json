@@ -1,0 +1,95 @@
+{
+  "consultation_report": {
+    "motif_de_consultation": "Douleur au dos persistante depuis huit mois, après avoir soulevé une caisse à l'entrepôt",
+    "interrogatoire": "La patiente rapporte une douleur au dos qui persiste depuis huit mois, avec des irradiations vers la fesse, mais sans engourdissement ou fourmillement dans la jambe. Elle a des difficultés à dormir en raison de la douleur et se sent stressée et déprimée. Elle a déjà pris du paracétamol pour soulager la douleur",
+    "examen_clinique": "L'IRM montre une discopathie à L4-L5 avec une petite protrusion, mais sans conflit radiculaire. Le médecin conclut que la patiente a une douleur mécanique du dos et une irradiation vers la fesse probablement liée à l'inflammation autour du disque",
+    "proposition_therapeutique": "Le médecin propose un arrêt de travail de trois semaines, des séances de kinésithérapie pour renforcer les muscles et améliorer la mobilité, et la prise de paracétamol et de kétoprofène si nécessaire. Il oriente également la patiente vers un psychologue pour gérer l'anxiété et le stress liés à la douleur chronique"
+  },
+  "medical_record": {
+    "motif_de_consultation": "douleur au dos",
+    "historique_medical": "douleur au dos depuis 8 à 9 mois, suite à une chute",
+    "antecedents": {
+      "medicaux": [],
+      "chirurgicaux": [],
+      "gynecologiques": [],
+      "familiaux": []
+    },
+    "mode_de_vie": {
+      "tabac": null,
+      "alcool": null,
+      "activite_physique": null,
+      "autre": "manutentionnaire à l'entrepôt depuis 15 ans"
+    },
+    "traitements_habituels": [
+      {
+        "nom_commercial": "paracétamol",
+        "molecule": "paracétamol",
+        "posologie": "3-4 fois par jour"
+      }
+    ],
+    "allergies": [],
+    "interrogatoire": {
+      "symptomes_generaux": "douleur au dos, irradiation vers la fesse",
+      "symptomes_par_organe": "douleur au dos, irradiation vers la fesse"
+    },
+    "examen_clinique": {
+      "constantes": {
+        "poids_kg": null,
+        "taille_cm": null,
+        "imc": null,
+        "pression_arterielle": null,
+        "frequence_cardiaque": null,
+        "temperature": null,
+        "spo2": null
+      },
+      "examen_specifique": "IRM du dos, discopathie à L4-L5"
+    },
+    "conclusion": {
+      "diagnostic": "discopathie à L4-L5, douleur mécanique du dos",
+      "proposition_therapeutique": "repos relatif, kiné, anti-douleurs si besoin",
+      "examens_complementaires": [],
+      "orientation": "kinésithérapeute, psychologue",
+      "prochaine_consultation": "dans 6 semaines"
+    }
+  },
+  "prescription": {
+    "prescriptions": [
+      {
+        "nom_commercial": "PARACETAMOL",
+        "molecule": "paracétamol",
+        "forme_galenique": null,
+        "dosage": null,
+        "posologie": {
+          "dose": null,
+          "frequence": "à dose régulière",
+          "voie": "orale"
+        },
+        "duree": null,
+        "renouvellement": {
+          "autorise": false,
+          "nombre_fois": null
+        },
+        "ald": false,
+        "instructions_complementaires": "ne pas dépasser 4 g par jour"
+      },
+      {
+        "nom_commercial": "KETOPROFENE",
+        "molecule": "kétoprofène",
+        "forme_galenique": null,
+        "dosage": null,
+        "posologie": {
+          "dose": null,
+          "frequence": null,
+          "voie": null
+        },
+        "duree": "deux semaines maximum",
+        "renouvellement": {
+          "autorise": false,
+          "nombre_fois": null
+        },
+        "ald": false,
+        "instructions_complementaires": "prudence avec la durée pour ne pas abîmer l'estomac"
+      }
+    ]
+  }
+}

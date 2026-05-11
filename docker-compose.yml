@@ -1,0 +1,55 @@
+x-gpu: &gpu
+  runtime: nvidia
+  environment:
+    - NVIDIA_VISIBLE_DEVICES=all
+    - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+x-volumes: &volumes
+  volumes:
+    - ./audio:/app/audio
+    - ./dataset:/app/dataset
+    - ./results:/app/results
+    - hf-cache:/root/.cache/huggingface
+    # Mount your local whisper cache so the model doesn't re-download
+    - C:/Users/raul5/.cache/whisper:/root/.cache/whisper
+
+services:
+
+  faster-whisper:
+    <<: [*gpu, *volumes]
+    build:
+      context: .
+      dockerfile: containers/faster_whisper/Dockerfile
+    image: stt-faster-whisper
+    container_name: stt-faster-whisper
+
+  whisper-large:
+    <<: *volumes
+    build:
+      context: .
+      dockerfile: containers/whisper_large/Dockerfile
+    image: stt-whisper-large
+    container_name: stt-whisper-large
+
+  whisperx:
+    <<: [*gpu, *volumes]
+    build:
+      context: .
+      dockerfile: containers/whisperx/Dockerfile
+    image: stt-whisperx
+    container_name: stt-whisperx
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - HF_TOKEN=${HF_TOKEN}
+
+  nvidia-conformer:
+    <<: [*gpu, *volumes]
+    build:
+      context: .
+      dockerfile: containers/nvidia_conformer/Dockerfile
+    image: stt-nvidia-conformer
+    container_name: stt-nvidia-conformer
+
+volumes:
+  hf-cache:

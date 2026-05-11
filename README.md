@@ -44,7 +44,37 @@ stt_benchmark/
 
 ## Quickstart
 
-Local install
+### Option A — Docker (recommended for sharing with your team)
+
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) with the NVIDIA Container Toolkit enabled.
+
+```bash
+# 1. Build the image
+docker build -t stt-benchmark .
+
+# 2. Run interactively with GPU + mounted volumes (Windows)
+docker run --gpus all -it --rm ^
+  -v "%cd%/audio":/app/audio ^
+  -v "%cd%/dataset":/app/dataset ^
+  -v "%cd%/results":/app/results ^
+  --env-file .env ^
+  stt-benchmark
+
+# Or with docker compose (handles volumes + GPU automatically):
+docker compose run benchmark
+
+# 3. Inside the container, run scripts normally:
+python prep_ground_truth.py --audio_dir ./audio --output_dir ./dataset
+```
+
+> **Sharing with your boss:** just send the whole project folder (excluding `audio/`, `dataset/`, `results/`, and `.env`). They run `docker build` + `docker compose run benchmark` and get an identical environment.
+
+---
+
+### Option B — Local install
+
+**⚠️ RTX 5060 / Blackwell GPU owners:** PyTorch stable does not support Blackwell yet.
+Use the nightly build with CUDA 12.8:
 
 ```bash
 pip uninstall torch torchvision torchaudio -y
@@ -65,6 +95,7 @@ pip install -r requirements.txt
 ```bash
 # Put your audio files in ./audio/
 python prep_ground_truth.py --audio_dir ./audio --output_dir ./dataset
+# set CUDA_VISIBLE_DEVICES=-1 && python containers/base/src/prep_ground_truth.py --audio_dir ./audio --output_dir ./dataset
 
 # Open the worksheet and correct column D (ground_truth)
 # Then freeze the test set:
@@ -74,6 +105,10 @@ python freeze_dataset.py --worksheet dataset/correction_worksheet.tsv
 ### 3. Run benchmarks (one per model)
 ```bash
 jupyter nbconvert --to notebook --execute notebook_whisper_large_v3.ipynb --output notebook_whisper_large_v3_executed.ipynb
+# or
+python notebook_whisper_large_v3.py
+python notebook_whisperx.py
+
 # Repeat for each model
 ```
 

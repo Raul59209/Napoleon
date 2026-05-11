@@ -1,0 +1,19 @@
+FROM stt-benchmark-base
+
+ARG HF_TOKEN
+ENV HF_TOKEN=$HF_TOKEN
+ENV HUGGINGFACE_HUB_TOKEN=$HF_TOKEN
+
+# Uninstall mismatched torchvision from base and reinstall matching version
+RUN pip uninstall torchvision -y && \
+    pip install --pre torchvision \
+    --index-url https://download.pytorch.org/whl/nightly/cu128
+
+# Pin transformers to version that exports Pipeline correctly
+RUN pip install "transformers==4.40.0"
+
+# Install whisperx 3.8.4 which supports faster-whisper 1.2+
+RUN pip install whisperx==3.8.4
+
+COPY containers/whisperx/notebook_whisperx.py /app/
+CMD ["python", "notebook_whisperx.py"]

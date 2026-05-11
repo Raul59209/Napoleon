@@ -1,0 +1,71 @@
+{
+  "consultation_report": {
+    "motif_de_consultation": "Baisse d'audition progressive et symétrique",
+    "interrogatoire": "Le patient présente une baisse d'audition progressive et symétrique des deux oreilles, accompagnée d'acouphènes (sifflements, bruits dans les oreilles) depuis environ un an. Il a un antécédent d'exposition au bruit lors de son service militaire il y a 30 ans. Il n'a pas d'antécédents de problèmes d'oreille, mais des allergies nasales l'hiver. Il n'a pas de vertiges, de nausées ou d'écoulement dans les oreilles.",
+    "examen_clinique": "L'examen des oreilles montre des conduits auditifs externes libres, des muqueuses normales, des tympans translucides et mobiles, sans inflammation ni effusion. Les tests de Weber et de Rhin sont réalisés, confirmant une surdité de perception. L'audiogramme tonal est prescrit pour confirmer le diagnostic et quantifier la perte auditive.",
+    "proposition_therapeutique": "Je propose au patient de réaliser un audiogramme tonal pour confirmer le diagnostic et quantifier la perte auditive. Je lui donne le contact d'une audioprothésiste pour qu'elle lui montre les appareils auditifs et lui fasse un devis. Je veux que le patient revienne me voir dans six semaines avec les résultats de l'audiogramme et le devis de l'audioprothésiste pour discuter de la suite. Je lui conseille également d'éviter les bruits forts, d'arrêter l'aspirine et les anti-inflammatoires à long terme, de rester hydraté et d'éviter le stress pour réduire les acouphènes."
+  },
+  "medical_record": {
+    "motif_de_consultation": "problèmes d'audition",
+    "historique_medical": "baisse d'audition progressive et symétrique des deux oreilles, acouphènes",
+    "antecedents": {
+      "medicaux": [
+        "allergies nasales l'hiver"
+      ],
+      "chirurgicaux": [],
+      "gynecologiques": [],
+      "familiaux": []
+    },
+    "mode_de_vie": {
+      "tabac": null,
+      "alcool": null,
+      "activite_physique": null,
+      "autre": "exposition au bruit militaire il y a 30 ans"
+    },
+    "traitements_habituels": [],
+    "allergies": [],
+    "interrogatoire": {
+      "symptomes_generaux": "baisse d'audition, acouphènes",
+      "symptomes_par_organe": "problèmes d'audition des deux oreilles"
+    },
+    "examen_clinique": {
+      "constantes": {
+        "poids_kg": null,
+        "taille_cm": null,
+        "imc": null,
+        "pression_arterielle": null,
+        "frequence_cardiaque": null,
+        "temperature": null,
+        "spo2": null
+      },
+      "examen_specifique": "examen des oreilles, test de Weber, test de Rhin"
+    },
+    "conclusion": {
+      "diagnostic": "presbyacousie associée à une composante traumatique",
+      "proposition_therapeutique": "audiogramme, aide auditive",
+      "examens_complementaires": [
+        "audiogramme"
+      ],
+      "orientation": "consultation chez l'audioprothésiste",
+      "prochaine_consultation": "dans six semaines"
+    }
+  },
+  "prescription": {
+    "prescriptions": [
+      {
+        "nom_commercial": null,
+        "molecule": null,
+        "forme_galenique": null,
+        "dosage": null,
+        "posologie": null,
+        "duree": null,
+        "renouvellement": {
+          "autorise": false,
+          "nombre_fois": null
+        },
+        "ald": false,
+        "instructions_complementaires": "Audiogramme tonal dans un labo référent"
+      }
+    ]
+  }
+}

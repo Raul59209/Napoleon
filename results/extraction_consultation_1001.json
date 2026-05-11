@@ -1,0 +1,151 @@
+{
+  "consultation_report": {
+    "motif_de_consultation": "Suivi de son diabète et de son hypertension artérielle, ainsi que pour des œdèmes aux chevilles",
+    "interrogatoire": "Le patient a des œdèmes aux chevilles, surtout le soir après une journée debout, et une légère essoufflement lors de l'effort. Il prend actuellement du pérendopril pour l'hypertension, de la metformine pour le diabète et de l'atorvastatine pour le cholestérol. Il a arrêté de fumer il y a 20 ans et boit un verre de vin le soir. Il a des antécédents familiaux de crise cardiaque et d'hypertension",
+    "examen_clinique": "La tension artérielle est à 148/86 mmHg, ce qui est un peu élevé. Le patient a une HBA1c à 7,8%, ce qui est légèrement élevé. Il a également des œdèmes aux chevilles",
+    "proposition_therapeutique": "Ajout d'indapamide 1,25 mg le matin pour aider à éliminer l'eau en excès et améliorer la tension artérielle. Renouvellement des traitements actuels (pérendopril, metformine, atorvastatine). Réalisation d'un ECG pour vérifier le fonctionnement cardiaque. Suivi dans 3 semaines pour vérifier les résultats des examens et ajuster les traitements si nécessaire"
+  },
+  "medical_record": {
+    "motif_de_consultation": "œdèmes aux chevilles, essoufflement",
+    "historique_medical": "diabète, cholestérol élevé, hypertension",
+    "antecedents": {
+      "medicaux": [
+        "diabète",
+        "cholestérol élevé",
+        "hypertension"
+      ],
+      "chirurgicaux": [],
+      "gynecologiques": [],
+      "familiaux": [
+        "crise cardiaque du père à 68-69 ans",
+        "tension élevée de la mère"
+      ]
+    },
+    "mode_de_vie": {
+      "tabac": "arrêté il y a 20 ans",
+      "alcool": "un verre de vin le soir, un peu de vin le week-end",
+      "activite_physique": "peu d'activité physique, marche le mercredi avec sa femme",
+      "autre": "retraité, plus sédentaire"
+    },
+    "traitements_habituels": [
+      {
+        "nom_commercial": "Périndopril",
+        "molecule": "Périndopril",
+        "posologie": "4 mg le matin"
+      },
+      {
+        "nom_commercial": "Metformine",
+        "molecule": "Metformine",
+        "posologie": "1000 mg matin et soir"
+      },
+      {
+        "nom_commercial": "Atorvastatine",
+        "molecule": "Atorvastatine",
+        "posologie": "40 mg le soir"
+      }
+    ],
+    "allergies": [],
+    "interrogatoire": {
+      "symptomes_generaux": "œdèmes aux chevilles, essoufflement",
+      "symptomes_par_organe": "douleur aux chevilles, essoufflement lors de la montée des escaliers"
+    },
+    "examen_clinique": {
+      "constantes": {
+        "poids_kg": null,
+        "taille_cm": null,
+        "imc": null,
+        "pression_arterielle": "148/86",
+        "frequence_cardiaque": null,
+        "temperature": null,
+        "spo2": null
+      },
+      "examen_specifique": "ECG recommandé"
+    },
+    "conclusion": {
+      "diagnostic": "hypertension, diabète, cholestérol élevé",
+      "proposition_therapeutique": "ajout de l'Indapamide 1,25 mg le matin, surveillance de la glycémie et de la pression artérielle",
+      "examens_complementaires": [
+        "ECG",
+        "prise de sang pour vérifier les ions et la créatinine"
+      ],
+      "orientation": "suivi en consultation dans 3 semaines",
+      "prochaine_consultation": "dans 3 semaines"
+    }
+  },
+  "prescription": {
+    "prescriptions": [
+      {
+        "nom_commercial": "PERINDOPRIL",
+        "molecule": "périndopril",
+        "forme_galenique": null,
+        "dosage": "4 mg",
+        "posologie": {
+          "dose": "4 mg",
+          "frequence": "le matin",
+          "voie": "orale"
+        },
+        "duree": null,
+        "renouvellement": {
+          "autorise": false,
+          "nombre_fois": null
+        },
+        "ald": false,
+        "instructions_complementaires": null
+      },
+      {
+        "nom_commercial": "METFORMINE",
+        "molecule": "metformine",
+        "forme_galenique": null,
+        "dosage": "1000 mg",
+        "posologie": {
+          "dose": "1000 mg",
+          "frequence": "matin et soir",
+          "voie": "orale"
+        },
+        "duree": null,
+        "renouvellement": {
+          "autorise": false,
+          "nombre_fois": null
+        },
+        "ald": false,
+        "instructions_complementaires": null
+      },
+      {
+        "nom_commercial": "ATORVASTATINE",
+        "molecule": "atorvastatine",
+        "forme_galenique": null,
+        "dosage": "40 mg",
+        "posologie": {
+          "dose": "40 mg",
+          "frequence": "le soir",
+          "voie": "orale"
+        },
+        "duree": null,
+        "renouvellement": {
+          "autorise": false,
+          "nombre_fois": null
+        },
+        "ald": false,
+        "instructions_complementaires": null
+      },
+      {
+        "nom_commercial": "INDAPAMIDE",
+        "molecule": "indapamide",
+        "forme_galenique": null,
+        "dosage": "1,25 mg",
+        "posologie": {
+          "dose": "1,25 mg",
+          "frequence": "le matin",
+          "voie": "orale"
+        },
+        "duree": null,
+        "renouvellement": {
+          "autorise": false,
+          "nombre_fois": null
+        },
+        "ald": false,
+        "instructions_complementaires": "Faire attention à vérifier les ions et créatinine dans 15 jours"
+      }
+    ]
+  }
+}

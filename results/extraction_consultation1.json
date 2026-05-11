@@ -1,0 +1,79 @@
+{
+  "consultation_report": {
+    "motif_de_consultation": "Suivi de la polypose nasosinusienne.",
+    "interrogatoire": "Le patient rapporte qu'il ne sent toujours pas les odeurs, qu'il a encore le nez bien bouché, mais qu'il a beaucoup moins de sécrétions. Il a bien réalisé les lavages de nez tous les jours et appliqué le Nasonex matin et soir comme indiqué. Il a pris une cure de cortisone par la bouche depuis la dernière consultation.",
+    "examen_clinique": "En nasofibroscopie, il y a toujours autant de polypes, mais je ne vois pas de pus.",
+    "proposition_therapeutique": "Je propose d'augmenter le traitement par le nez en passant à deux pulvérisations par narine de matin et soir de Nasonex et en continuant bien les lavages de nez. On fera un point dans 3 mois et si vraiment il n'y a pas d'amélioration ou une amélioration très insuffisante, on discutera de la chirurgie. J'insiste sur l'importance d'éviter au maximum la cortisone per os, notamment en raison du diabète du patient."
+  },
+  "medical_record": {
+    "motif_de_consultation": "suivi de traitement pour polypes et perte d'odorat",
+    "historique_medical": "diabète",
+    "antecedents": {
+      "medicaux": [
+        "diabète"
+      ],
+      "chirurgicaux": [],
+      "gynecologiques": [],
+      "familiaux": []
+    },
+    "mode_de_vie": {
+      "tabac": null,
+      "alcool": null,
+      "activite_physique": null,
+      "autre": null
+    },
+    "traitements_habituels": [
+      {
+        "nom_commercial": "Nasonex",
+        "molecule": null,
+        "posologie": "matin et soir"
+      }
+    ],
+    "allergies": [],
+    "interrogatoire": {
+      "symptomes_generaux": "perte d'odorat, nez bouché",
+      "symptomes_par_organe": null
+    },
+    "examen_clinique": {
+      "constantes": {
+        "poids_kg": null,
+        "taille_cm": null,
+        "imc": null,
+        "pression_arterielle": null,
+        "frequence_cardiaque": null,
+        "temperature": null,
+        "spo2": null
+      },
+      "examen_specifique": "examen avec caméra pour regarder les polypes"
+    },
+    "conclusion": {
+      "diagnostic": "polypes",
+      "proposition_therapeutique": "augmentation du traitement par le nez, deux pulvérisations par narine de matin et soir, et continuation des lavages de nez",
+      "examens_complementaires": [],
+      "orientation": null,
+      "prochaine_consultation": "dans 3 mois"
+    }
+  },
+  "prescription": {
+    "prescriptions": [
+      {
+        "nom_commercial": "NASONEX",
+        "molecule": "mométasone",
+        "forme_galenique": "spray nasal",
+        "dosage": null,
+        "posologie": {
+          "dose": "2 pulvérisations",
+          "frequence": "matin et soir",
+          "voie": "nasale"
+        },
+        "duree": null,
+        "renouvellement": {
+          "autorise": false,
+          "nombre_fois": null
+        },
+        "ald": false,
+        "instructions_complementaires": "continuer les lavages de nez"
+      }
+    ]
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "consultation_report": {
+    "motif_de_consultation": "Vertiges",
+    "interrogatoire": "La patiente présente des vertiges depuis une semaine, qui apparaissent lorsqu'elle change de position, notamment lorsqu'elle se lève du lit ou se retourne dans le lit. Les vertiges durent environ 30 secondes à une minute et sont accompagnés de nausées, mais sans vomissement. La patiente n'a pas de problèmes de santé sous-jacents, à l'exception d'une tension légère.",
+    "examen_clinique": "L'examen des oreilles est normal. Le test de Dix-Hallpike a déclenché un vertige et a permis de confirmer le diagnostic de vertige positionnel paroxystique bénin (VPPB). La manœuvre libératoire de Semon a été réalisée pour repositionner les cristaux de l'oreille interne.",
+    "proposition_therapeutique": "La patiente doit dormir semi-assise pendant les deux prochaines nuits, éviter les mouvements brusques de la tête et reprendre ses activités normales demain. Un kinésithérapeute spécialisé en vestibulaire pourra être consulté si les vertiges reviennent ou persistent après deux semaines. Un suivi est prévu dans deux semaines pour évaluer l'évolution de la patiente."
+  },
+  "medical_record": {
+    "motif_de_consultation": "Vertiges",
+    "historique_medical": "Aucun problème de santé majeur, juste un peu de tension",
+    "antecedents": {
+      "medicaux": [],
+      "chirurgicaux": [],
+      "gynecologiques": [],
+      "familiaux": []
+    },
+    "mode_de_vie": {
+      "tabac": null,
+      "alcool": null,
+      "activite_physique": null,
+      "autre": null
+    },
+    "traitements_habituels": [],
+    "allergies": [],
+    "interrogatoire": {
+      "symptomes_generaux": "Vertiges, nausées",
+      "symptomes_par_organe": "Vertiges lors du changement de position, nausées"
+    },
+    "examen_clinique": {
+      "constantes": {
+        "poids_kg": null,
+        "taille_cm": null,
+        "imc": null,
+        "pression_arterielle": null,
+        "frequence_cardiaque": null,
+        "temperature": null,
+        "spo2": null
+      },
+      "examen_specifique": "Examen des oreilles, test de Dix-Hallpike, manœuvre de Semon"
+    },
+    "conclusion": {
+      "diagnostic": "Vertige positionnel paroxystique bénin (VPPB)",
+      "proposition_therapeutique": "Manœuvre de Semon, recommandations pour les 48 prochaines heures (dormir semi-assise, éviter les mouvements brusques de la tête)",
+      "examens_complementaires": [],
+      "orientation": "Kinésithérapeute spécialisé en vestibulaire si les vertiges reviennent ou n'ont pas disparu après deux semaines",
+      "prochaine_consultation": "Dans deux semaines"
+    }
+  },
+  "prescription": {
+    "prescriptions": []
+  }
+}

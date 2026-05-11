@@ -1,53 +1,48 @@
 """
-notebook_whisperx.py — Benchmark: WhisperX
-===========================================
-WhisperX adds forced word-level alignment and speaker diarization on top
-of faster-whisper. For STT accuracy benchmarking we care about the
-transcript text — alignment is a bonus.
+notebook_nvidia_conformer.py — Benchmark: NVIDIA STT Fr Conformer-CTC Large
+============================================================================
+Model: nvidia/stt_fr_conformer_ctc_large (NeMo)
+Docs:  https://huggingface.co/nvidia/stt_fr_conformer_ctc_large
 
 Install:
-    pip install whisperx
+    pip install nemo_toolkit[asr]
+    # If nemo_toolkit has conflicts, try the lighter:
+    # pip install nemo_toolkit
 
-Note: WhisperX downloads a phoneme alignment model from HuggingFace
-on first run (~1 GB). You may need a HF token for some alignment models:
-    set HF_TOKEN=your_token_here
+Note: NeMo will download the model from HuggingFace on first run (~500 MB).
+This model is purpose-built for French — no initial_prompt needed.
 
 Run:
-    python notebook_whisperx.py
+    python notebook_nvidia_conformer.py
 """
 
-import os
 import sys
 import json
 import time
 import logging
+import tempfile
 from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
-from normalizer import MedicalNormalizer
+sys.path.insert(0, "/app/src")
+from normalizer import MedicalNormalizer 
 from metrics import BenchmarkMetrics
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
+# Suppress NeMo's verbose logging
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # ── Config ────────────────────────────────────────────────────────────────────
-MODEL_SIZE      = "large-v3"
-LANGUAGE        = "fr"
+MODEL_NAME      = "nvidia/stt_fr_conformer_ctc_large"
 DATASET_PATH    = Path("dataset/test_set_frozen.json")
 AUDIO_BASE_DIR  = Path("audio")
 RESULTS_DIR     = Path("results")
-RESULTS_PATH    = RESULTS_DIR / "results_whisperx.csv"
+RESULTS_PATH    = RESULTS_DIR / "results_nvidia_conformer.csv"
 RESULTS_DIR.mkdir(exist_ok=True)
-
-# WhisperX compute type — "float16" for GPU, "int8" for CPU
-# Will auto-fallback to CPU if GPU fails
-COMPUTE_TYPE    = "float16"
-DEVICE          = "cuda"
-BATCH_SIZE      = 8   # reduce if GPU OOM; use 1 for CPU
-
-HF_TOKEN = os.environ.get("HF_TOKEN", None)
 
 # ── Load dataset ──────────────────────────────────────────────────────────────
 with open(DATASET_PATH, encoding="utf-8") as f:
@@ -59,54 +54,117 @@ log.info(f"Dataset fingerprint: {fingerprint}")
 log.info(f"Segments: {len(segments)} | Total audio: {dataset['total_duration_s']:.1f}s")
 
 # ── Load model ────────────────────────────────────────────────────────────────
-log.info(f"Loading WhisperX {MODEL_SIZE}...")
+log.info(f"Loading {MODEL_NAME}...")
+log.info("(First run downloads ~500 MB from HuggingFace)")
 try:
-    import whisperx
-    model = whisperx.load_model(
-        MODEL_SIZE,
-        device=DEVICE,
-        compute_type=COMPUTE_TYPE,
-        language=LANGUAGE,
+    import nemo.collections.asr as nemo_asr
+    model = nemo_asr.models.EncDecCTCModelBPE.from_pretrained(MODEL_NAME)
+    model.eval()
+
+    # Try GPU
+    import torch
+    if torch.cuda.is_available():
+        try:
+            torch.zeros(1).cuda()
+            model = model.cuda()
+            model = model.half()
+            device = "cuda"
+            log.info("Model on GPU ✓")
+        except Exception as e:
+            log.warning(f"GPU failed: {e} — using CPU")
+            device = "cpu"
+    else:
+        device = "cpu"
+        log.info("Model on CPU")
+
+except ImportError:
+    log.error(
+        "NeMo not installed. Run:\n"
+        "  pip install nemo_toolkit[asr]\n"
+        "If that fails due to conflicts, try:\n"
+        "  pip install nemo_toolkit"
     )
-    log.info(f"WhisperX loaded on {DEVICE}/{COMPUTE_TYPE} ✓")
+    sys.exit(1)
 except Exception as e:
-    log.warning(f"GPU load failed: {e}")
-    log.info("Retrying on CPU/int8...")
-    DEVICE, COMPUTE_TYPE, BATCH_SIZE = "cpu", "int8", 1
-    import whisperx
-    model = whisperx.load_model(
-        MODEL_SIZE,
-        device=DEVICE,
-        compute_type=COMPUTE_TYPE,
-        language=LANGUAGE,
-    )
-    log.info("WhisperX loaded on CPU ✓")
+    log.error(f"Failed to load model: {e}")
+    sys.exit(1)
 
 norm    = MedicalNormalizer()
 metrics = BenchmarkMetrics()
 
+# ── Audio preprocessing ───────────────────────────────────────────────────────
+def ensure_wav_16k(audio_path: Path) -> Path:
+    """
+    NeMo Conformer-CTC expects 16kHz mono WAV.
+    Converts m4a/mp3/flac on the fly using soundfile + librosa.
+    Returns path to a (possibly temp) WAV file.
+    """
+    if audio_path.suffix.lower() == ".wav":
+        return audio_path
+
+    try:
+        import librosa
+        import soundfile as sf
+
+        y, sr = librosa.load(str(audio_path), sr=16000, mono=True)
+        tmp   = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        sf.write(tmp.name, y, 16000, subtype="PCM_16")
+        log.info(f"  Converted {audio_path.name} → 16kHz WAV")
+        return Path(tmp.name)
+    except Exception as e:
+        log.error(f"  Audio conversion failed: {e}")
+        log.error("  Install: pip install librosa soundfile")
+        raise
+
 # ── Transcribe ────────────────────────────────────────────────────────────────
 def transcribe(audio_path: Path) -> tuple[str, float]:
+    import librosa
+    import soundfile as sf
+    import numpy as np
+    import torch
+
+    wav_path = ensure_wav_16k(audio_path)
+
+    # Load full audio
+    audio, sr = librosa.load(str(wav_path), sr=16000)
+
+    chunk_seconds = 30
+    chunk_samples = sr * chunk_seconds
+
+    texts = []
+
     t0 = time.perf_counter()
 
-    # Load audio
-    audio = whisperx.load_audio(str(audio_path))
+    for start in range(0, len(audio), chunk_samples):
+        chunk = audio[start:start + chunk_samples]
 
-    # Transcribe
-    result = model.transcribe(
-        audio,
-        batch_size=BATCH_SIZE,
-        language=LANGUAGE,
-        initial_prompt=(
-            "Transcription médicale en français. "
-            "Termes: mg, ml, narine, polypes, cortisone, Nasonex."
-        ),
-    )
+        # temp chunk file
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        sf.write(tmp.name, chunk, sr)
 
-    # Concatenate all segments
-    text = " ".join(s["text"].strip() for s in result.get("segments", []))
-    latency = time.perf_counter() - t0
-    return text.strip(), latency
+        try:
+            result = model.transcribe(
+                [tmp.name],
+                batch_size=1
+            )
+
+            raw = result[0] if result else ""
+            text = raw.text if hasattr(raw, "text") else str(raw)
+
+            texts.append(text.strip())
+
+        finally:
+            Path(tmp.name).unlink(missing_ok=True)
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+    elapsed = time.perf_counter() - t0
+
+    if wav_path != audio_path and wav_path.exists():
+        wav_path.unlink()
+
+    return " ".join(texts), elapsed
 
 # ── Run benchmark ─────────────────────────────────────────────────────────────
 records = []
@@ -140,10 +198,13 @@ for idx, seg in enumerate(segments):
         for err in result.med_critical_errors:
             log.warning(f"  ⚠️  {err}")
 
+    log.info(f"  REF: {gt_norm[:100]}")
+    log.info(f"  HYP: {hyp_norm[:100]}")
+
     records.append({
-        "model":               f"whisperx-{MODEL_SIZE}",
-        "device":              DEVICE,
-        "compute_type":        COMPUTE_TYPE,
+        "model":               MODEL_NAME.split("/")[-1],
+        "device":              device,
+        "compute_type":        "fp32",
         "segment_id":          seg_id,
         "audio_file":          seg["audio_file"],
         "duration_s":          duration_s,
@@ -161,7 +222,7 @@ df.to_csv(RESULTS_PATH, index=False, encoding="utf-8")
 log.info(f"Results saved → {RESULTS_PATH}")
 
 print("\n" + "=" * 60)
-print(f"RESULTS — WhisperX {MODEL_SIZE} ({DEVICE}/{COMPUTE_TYPE})")
+print(f"RESULTS — {MODEL_NAME} ({device})")
 print("=" * 60)
 print(f"  Segments:        {len(df)}")
 print(f"  Mean WER:        {df['wer'].mean():.3f}")

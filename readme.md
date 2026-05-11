@@ -95,6 +95,7 @@ pip install -r requirements.txt
 ```bash
 # Put your audio files in ./audio/
 python prep_ground_truth.py --audio_dir ./audio --output_dir ./dataset
+# set CUDA_VISIBLE_DEVICES=-1 && python containers/base/src/prep_ground_truth.py --audio_dir ./audio --output_dir ./dataset
 
 # Open the worksheet and correct column D (ground_truth)
 # Then freeze the test set:
@@ -104,6 +105,10 @@ python freeze_dataset.py --worksheet dataset/correction_worksheet.tsv
 ### 3. Run benchmarks (one per model)
 ```bash
 jupyter nbconvert --to notebook --execute notebook_whisper_large_v3.ipynb --output notebook_whisper_large_v3_executed.ipynb
+# or
+python notebook_whisper_large_v3.py
+python notebook_whisperx.py
+
 # Repeat for each model
 ```
 
