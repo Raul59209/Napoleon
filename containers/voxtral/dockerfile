@@ -1,0 +1,18 @@
+# containers/voxtral/Dockerfile
+
+FROM stt-benchmark-base
+
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+RUN pip install --upgrade pip
+
+RUN pip install \
+    "transformers>=4.51.0" \
+    "accelerate>=1.6.0" \
+    "sentencepiece>=0.2.0" \
+    "safetensors>=0.5.3" \
+    "einops>=0.8.1"
+
+COPY containers/voxtral/notebook_voxtral.py /app/
+
+CMD ["python", "notebook_voxtral.py"]

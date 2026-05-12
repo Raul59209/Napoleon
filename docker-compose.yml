@@ -51,5 +51,17 @@ services:
     image: stt-nvidia-conformer
     container_name: stt-nvidia-conformer
 
+  voxtral:
+    <<: [*gpu, *volumes]
+    build:
+      context: .
+      dockerfile: containers/voxtral/Dockerfile
+    image: stt-voxtral
+    container_name: stt-voxtral
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - HF_TOKEN=${HF_TOKEN}
+
 volumes:
   hf-cache:
