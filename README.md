@@ -591,12 +591,3 @@ nvidia-smi
 - LLM peut halluciner des informations (vérifier toujours)
 - Audio très bruyant: qualité réduite
 
-## Contributeurs et licence
-
-Développé par **Raul59209**
-
-Licence: Propriétaire
-
-## Auteurs
-
-- **Raul59209**: Architecture, benchmark STT, intégration
