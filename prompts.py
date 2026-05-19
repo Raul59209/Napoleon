@@ -100,9 +100,12 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans 
   "mode_de_vie": {{
     "tabac": "string ou null",
     "alcool": "string ou null",
+    "drogues": "string ou null",
     "activite_physique": "string ou null",
+    "voyages_recents": "string ou null",
     "autre": "string ou null"
   }},
+  "vaccins": [],
   "traitements_habituels": [
     {{
       "nom_commercial": "string",
@@ -113,7 +116,16 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans 
   "allergies": ["liste de strings ou tableau vide"],
   "interrogatoire": {{
     "symptomes_generaux": "string ou null",
-    "symptomes_par_organe": "string ou null"
+    "symptomes_par_organe": "string ou null" [
+      {{
+        "organe": "string",
+        "symptomes": "string"
+        "date_debut": "string ou null",
+        "evolution": "string ou null",
+        "traitements_testes": "string ou null"
+      }}
+    ],
+    "examens_realises": "string ou null"
   }},
   "examen_clinique": {{
     "constantes": {{
@@ -170,9 +182,10 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans 
   "prescriptions": [
     {{
       "nom_commercial": "string — nom de marque en majuscules (ex: NASONEX)",
-      "molecule": "string ou null — DCI en minuscules (ex: mométasone)",
+      "dci": "string ou null — DCI en minuscules (ex: mométasone)",
       "forme_galenique": "string ou null — comprimé, gélule, solution, spray nasal, etc.",
       "dosage": "string ou null — ex: 500 mg, 1 pulvérisation",
+      "voie_administration": "string ou null — ex: orale, nasale, intraveineuse, cutanée",
       "posologie": {{
         "dose": "string — ex: 2 pulvérisations, 1 comprimé",
         "frequence": "string — ex: matin et soir, toutes les 8 heures, 3 fois par jour",
