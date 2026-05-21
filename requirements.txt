@@ -13,7 +13,7 @@
 
 # ── Voxtral (Mistral API) ───────────────────────────────────────────────────
 #mistralai>=1.2.0           # Official Mistral Python SDK
-#python-dotenv>=1.0.0       # Load MISTRAL_API_KEY from .env
+python-dotenv>=1.0.0       # Load MISTRAL_API_KEY from .env
 
 # ── Whisper family ─────────────────────────────────────────────────────────
 openai-whisper>=20231117
@@ -46,3 +46,13 @@ ipykernel>=6.25.0
 
 # ── Utilities ──────────────────────────────────────────────────────────────
 tqdm>=4.66.0
+
+# ── Web / Demo ────────────────────────────────────────────────────────────
+streamlit>=1.31.0          # Streamlit web framework
+requests>=2.31.0           # HTTP requests
+
+# ── Scaleway STT ───────────────────────────────────────────────────────────
+# (Already installed via requests, no additional deps needed)
+
+# ── JSON/API ───────────────────────────────────────────────────────────────
+pydantic>=2.0.0            # Data validation
