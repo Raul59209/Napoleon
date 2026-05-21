@@ -71,6 +71,8 @@ if "audio_file" not in st.session_state:
     st.session_state.audio_file = None
 if "transcription" not in st.session_state:
     st.session_state.transcription = None
+if "transcription_editable" not in st.session_state:
+    st.session_state.transcription_editable = None
 if "consultation" not in st.session_state:
     st.session_state.consultation = None
 if "ordonnance" not in st.session_state:
@@ -85,7 +87,7 @@ if "posos_validation" not in st.session_state:
 # ============================================================
 
 def generate_pdf_consultation(consultation_data):
-    """Generate consultation PDF with ReportLab"""
+    """Generate consultation PDF with ReportLab - WITHOUT full transcription"""
     if not HAS_REPORTLAB:
         st.error("ReportLab not installed. Install with: pip install reportlab")
         return None
@@ -212,6 +214,10 @@ with col1:
 with col2:
     st.markdown("")
     st.markdown("")
+    if HAS_REPORTLAB:
+        st.success("✓ PDF Ready")
+    else:
+        st.error("❌ ReportLab Missing")
     if HAS_DEPS:
         st.success("✓ Dépendances chargées")
     else:
@@ -392,21 +398,23 @@ Je la reverrai dans 3 mois pour réévaluation.
                         progress_bar.progress(100)
                     
                     st.session_state.transcription = transcription
+                    st.session_state.transcription_editable = transcription
                     status_text.empty()
                     progress_bar.empty()
                     
                     st.success("✓ Transcription terminée")
                     
-                    with st.expander("📝 Voir la transcription complète", expanded=True):
-                        st.text_area(
-                            "Texte de la transcription:",
+                    with st.expander("📝 Voir et éditer la transcription complète", expanded=True):
+                        edited_transcription = st.text_area(
+                            "Texte de la transcription (modifiable):",
                             transcription,
-                            height=200,
-                            disabled=True,
+                            height=300,
                             label_visibility="collapsed"
                         )
+                        st.session_state.transcription_editable = edited_transcription
                     
                     st.info(f"📊 Longueur: {len(transcription.split())} mots")
+                    st.tip("💡 Vous pouvez éditer la transcription ci-dessus en cas d'erreur de reconnaissance vocale")
                 
                 except Exception as e:
                     st.error(f"❌ Erreur de transcription: {str(e)}")
@@ -436,7 +444,7 @@ with tab3:
                     if HAS_DEPS and False:
                         status_text.text("Appel à l'API LLM...")
                         progress_bar.progress(50)
-                        prompt = build_prompt("consultation_report", st.session_state.transcription)
+                        prompt = build_prompt("consultation_report", st.session_state.transcription_editable)
                     
                     else:
                         status_text.text("Traitement avec LLM...")
@@ -646,7 +654,10 @@ with tab5:
     if st.session_state.consultation is None or st.session_state.ordonnance is None:
         st.warning("⚠️ Compléter l'extraction d'abord (Tabs 3 & 4)")
     else:
-        st.success("✓ Toutes les données prêtes pour la génération PDF")
+        if not HAS_REPORTLAB:
+            st.error("❌ ReportLab n'est pas installé. Installer avec: pip install reportlab")
+        else:
+            st.success("✓ Toutes les données prêtes pour la génération PDF")
         
         st.divider()
         
@@ -656,35 +667,41 @@ with tab5:
             st.subheader("📄 Rapport de Consultation")
             
             if st.button("Générer PDF Consultation", key="btn_pdf_consultation", use_container_width=True):
-                with st.spinner("Génération du PDF..."):
-                    pdf_data = generate_pdf_consultation(st.session_state.consultation)
-                    
-                    if pdf_data:
-                        st.success("✓ PDF généré")
-                        st.download_button(
-                            label="⬇️ Télécharger Rapport de Consultation",
-                            data=pdf_data,
-                            file_name=f"consultation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
+                if not HAS_REPORTLAB:
+                    st.error("ReportLab non installé")
+                else:
+                    with st.spinner("Génération du PDF..."):
+                        pdf_data = generate_pdf_consultation(st.session_state.consultation)
+                        
+                        if pdf_data:
+                            st.success("✓ PDF généré")
+                            st.download_button(
+                                label="⬇️ Télécharger Rapport de Consultation",
+                                data=pdf_data,
+                                file_name=f"consultation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
         
         with col2:
             st.subheader("💊 Ordonnance Médicale")
             
             if st.button("Générer PDF Ordonnance", key="btn_pdf_ordonnance", use_container_width=True):
-                with st.spinner("Génération du PDF..."):
-                    pdf_data = generate_pdf_ordonnance(st.session_state.ordonnance)
-                    
-                    if pdf_data:
-                        st.success("✓ PDF généré")
-                        st.download_button(
-                            label="⬇️ Télécharger Ordonnance",
-                            data=pdf_data,
-                            file_name=f"ordonnance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
+                if not HAS_REPORTLAB:
+                    st.error("ReportLab non installé")
+                else:
+                    with st.spinner("Génération du PDF..."):
+                        pdf_data = generate_pdf_ordonnance(st.session_state.ordonnance)
+                        
+                        if pdf_data:
+                            st.success("✓ PDF généré")
+                            st.download_button(
+                                label="⬇️ Télécharger Ordonnance",
+                                data=pdf_data,
+                                file_name=f"ordonnance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
         
         st.divider()
         
