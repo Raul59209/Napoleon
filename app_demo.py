@@ -97,6 +97,7 @@ with st.sidebar:
     stt_model = st.radio(
         "Choose Speech-to-Text model:",
         ["Whisper Large V3", "Faster-Whisper", "Voxtral Mini", "WhisperX"],
+        index=1,  # Default to Faster-Whisper (index 1)
         help="Different models have different speed/accuracy tradeoffs"
     )
     
@@ -503,10 +504,10 @@ with tab4:
                             
                             with col2:
                                 st.markdown("**Posology**")
-                                st.write(f"**Dose:** {drug['posologia']['dose']}")
-                                st.write(f"**Frequency:** {drug['posology']['frequence']}")
-                                st.write(f"**Duration:** {drug['posology']['duree']}")
-                                st.write(f"**Instructions:** {drug['posology']['instructions']}")
+                                st.write(f"**Dose:** {drug['posologie']['dose']}")
+                                st.write(f"**Frequency:** {drug['posologie']['frequence']}")
+                                st.write(f"**Duration:** {drug['posologie']['duree']}")
+                                st.write(f"**Instructions:** {drug['posologie']['instructions']}")
                             
                             st.markdown("**Validation**")
                             if drug['posos_validated']:
@@ -596,8 +597,8 @@ PRESCRIPTIONS:
 
 {drug['nom_commercial']} ({drug['dci']})
 Dosage: {drug['dosage']}
-Posologie: {drug['posology']['dose']} {drug['posology']['frequence']}
-Durée: {drug['posology']['duree']}
+Posologie: {drug['posologie']['dose']} {drug['posologie']['frequence']}
+Durée: {drug['posologie']['duree']}
 """.encode()
                     
                     st.success("✓ PDF generated")
