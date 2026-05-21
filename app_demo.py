@@ -19,11 +19,10 @@ from pathlib import Path
 from datetime import datetime
 import tempfile
 from io import BytesIO
-import base64
 
 # Try to import PDF library
 try:
-    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -228,12 +227,8 @@ with st.sidebar:
     st.header("⚙️ Configuration")
     
     st.subheader("Modèle STT")
-    stt_model = st.radio(
-        "Choisir le modèle:",
-        ["Whisper Large V3", "Faster-Whisper", "Voxtral Mini", "WhisperX"],
-        index=1,
-        help="Différents modèles avec différents compromis vitesse/précision"
-    )
+    st.info("**Faster-Whisper** - Rapide et précis pour le français")
+    stt_model = "Faster-Whisper"
     
     st.subheader("Fournisseur LLM")
     llm_provider = st.radio(
@@ -268,7 +263,7 @@ with st.sidebar:
     st.subheader("📊 Statut")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("STT", stt_model.split()[0])
+        st.metric("STT", "Faster-Whisper")
     with col2:
         st.metric("LLM", llm_provider.split()[0])
 
@@ -327,18 +322,13 @@ with tab1:
 
 with tab2:
     st.header("Transcription Automatique")
+    st.markdown("**Modèle:** Faster-Whisper - Optimisé pour les consultations médicales en français")
     
     if st.session_state.audio_file is None:
         st.warning("⚠️ Charger d'abord un fichier audio (Tab 1)")
     else:
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.markdown(f"**Modèle:** {stt_model}")
-            st.markdown(f"**Fichier:** {st.session_state.audio_file.name}")
-        
         if st.button("🎤 Démarrer la transcription", key="btn_transcribe", use_container_width=True):
-            with st.spinner(f"Transcription avec {stt_model}..."):
+            with st.spinner("Transcription avec Faster-Whisper..."):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
@@ -703,7 +693,7 @@ with tab5:
         summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
         
         with summary_col1:
-            st.metric("Modèle STT", stt_model.split()[0])
+            st.metric("Modèle STT", "Faster-Whisper")
         with summary_col2:
             st.metric("Fournisseur LLM", llm_provider.split()[0])
         with summary_col3:
