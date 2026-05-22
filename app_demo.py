@@ -71,8 +71,6 @@ if "audio_file" not in st.session_state:
     st.session_state.audio_file = None
 if "transcription" not in st.session_state:
     st.session_state.transcription = None
-if "transcription_editable" not in st.session_state:
-    st.session_state.transcription_editable = None
 if "consultation" not in st.session_state:
     st.session_state.consultation = None
 if "ordonnance" not in st.session_state:
@@ -103,7 +101,7 @@ def transcribe_audio_scaleway(audio_path):
 
 
 def generate_pdf_consultation(consultation_data):
-    """Generate consultation PDF with ReportLab - WITHOUT full transcription"""
+    """Generate consultation PDF with ReportLab"""
     if not HAS_REPORTLAB:
         st.error("ReportLab not installed. Install with: pip install reportlab")
         return None
