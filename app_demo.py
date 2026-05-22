@@ -25,7 +25,7 @@ try:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib import colors
     HAS_REPORTLAB = True
 except ImportError:
@@ -86,6 +86,22 @@ if "posos_validation" not in st.session_state:
 # Helper Functions
 # ============================================================
 
+def transcribe_audio_scaleway(audio_path):
+    """Transcribe audio file using Scaleway STT API"""
+    try:
+        stt_client = ScalewaySTT()
+        result = stt_client.transcribe_file(audio_path)
+        
+        # Extract text from result
+        if isinstance(result, dict) and "text" in result:
+            return result["text"]
+        else:
+            return str(result)
+    except Exception as e:
+        st.error(f"❌ Erreur Scaleway: {str(e)}")
+        return None
+
+
 def generate_pdf_consultation(consultation_data):
     """Generate consultation PDF with ReportLab - WITHOUT full transcription"""
     if not HAS_REPORTLAB:
@@ -94,7 +110,7 @@ def generate_pdf_consultation(consultation_data):
     
     try:
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
         elements = []
         styles = getSampleStyleSheet()
         
@@ -105,34 +121,56 @@ def generate_pdf_consultation(consultation_data):
             fontSize=18,
             textColor=colors.HexColor('#1f77b4'),
             spaceAfter=30,
-            alignment=1
+            alignment=1,
+            fontName='Helvetica-Bold'
         )
         
         elements.append(Paragraph("RAPPORT DE CONSULTATION MÉDICALE", title_style))
         elements.append(Spacer(1, 0.3*inch))
         
         # Date
-        elements.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%d/%m/%Y')}", styles['Normal']))
+        date_style = ParagraphStyle(
+            'DateStyle',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.HexColor('#333333')
+        )
+        elements.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%d/%m/%Y à %H:%M')}", date_style))
         elements.append(Spacer(1, 0.2*inch))
         
         # Motif
-        elements.append(Paragraph("<b>MOTIF DE CONSULTATION:</b>", styles['Heading3']))
-        elements.append(Paragraph(consultation_data.get('motif_de_consultation', 'N/A'), styles['Normal']))
+        section_style = ParagraphStyle(
+            'SectionStyle',
+            parent=styles['Heading3'],
+            fontSize=12,
+            textColor=colors.HexColor('#1f77b4'),
+            fontName='Helvetica-Bold',
+            spaceAfter=12
+        )
+        
+        elements.append(Paragraph("MOTIF DE CONSULTATION", section_style))
+        content_style = ParagraphStyle(
+            'ContentStyle',
+            parent=styles['Normal'],
+            fontSize=11,
+            alignment=4
+        )
+        elements.append(Paragraph(consultation_data.get('motif_de_consultation', 'N/A'), content_style))
         elements.append(Spacer(1, 0.2*inch))
         
         # Interrogatoire
-        elements.append(Paragraph("<b>INTERROGATOIRE:</b>", styles['Heading3']))
-        elements.append(Paragraph(consultation_data.get('interrogatoire', 'N/A'), styles['Normal']))
+        elements.append(Paragraph("INTERROGATOIRE", section_style))
+        elements.append(Paragraph(consultation_data.get('interrogatoire', 'N/A'), content_style))
         elements.append(Spacer(1, 0.2*inch))
         
         # Examen Clinique
-        elements.append(Paragraph("<b>EXAMEN CLINIQUE:</b>", styles['Heading3']))
-        elements.append(Paragraph(consultation_data.get('examen_clinique', 'N/A'), styles['Normal']))
+        elements.append(Paragraph("EXAMEN CLINIQUE", section_style))
+        elements.append(Paragraph(consultation_data.get('examen_clinique', 'N/A'), content_style))
         elements.append(Spacer(1, 0.2*inch))
         
         # Proposition Thérapeutique
-        elements.append(Paragraph("<b>PROPOSITION THÉRAPEUTIQUE:</b>", styles['Heading3']))
-        elements.append(Paragraph(consultation_data.get('proposition_therapeutique', 'N/A'), styles['Normal']))
+        elements.append(Paragraph("PROPOSITION THÉRAPEUTIQUE", section_style))
+        elements.append(Paragraph(consultation_data.get('proposition_therapeutique', 'N/A'), content_style))
         
         # Build PDF
         doc.build(elements)
@@ -152,7 +190,7 @@ def generate_pdf_ordonnance(ordonnance_data):
     
     try:
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
         elements = []
         styles = getSampleStyleSheet()
         
@@ -163,35 +201,60 @@ def generate_pdf_ordonnance(ordonnance_data):
             fontSize=18,
             textColor=colors.HexColor('#1f77b4'),
             spaceAfter=30,
-            alignment=1
+            alignment=1,
+            fontName='Helvetica-Bold'
         )
         
         elements.append(Paragraph("ORDONNANCE MÉDICALE", title_style))
         elements.append(Spacer(1, 0.3*inch))
         
         # Date
-        elements.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%d/%m/%Y')}", styles['Normal']))
+        date_style = ParagraphStyle(
+            'DateStyle',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.HexColor('#333333')
+        )
+        elements.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%d/%m/%Y à %H:%M')}", date_style))
         elements.append(Spacer(1, 0.3*inch))
         
         # Prescriptions
-        elements.append(Paragraph("<b>PRESCRIPTIONS:</b>", styles['Heading3']))
-        elements.append(Spacer(1, 0.2*inch))
+        section_style = ParagraphStyle(
+            'SectionStyle',
+            parent=styles['Heading3'],
+            fontSize=12,
+            textColor=colors.HexColor('#1f77b4'),
+            fontName='Helvetica-Bold',
+            spaceAfter=12
+        )
         
-        for drug in ordonnance_data.get('prescriptions', []):
-            # Drug name
+        elements.append(Paragraph("PRESCRIPTIONS", section_style))
+        elements.append(Spacer(1, 0.1*inch))
+        
+        content_style = ParagraphStyle(
+            'ContentStyle',
+            parent=styles['Normal'],
+            fontSize=11,
+            alignment=4
+        )
+        
+        for i, drug in enumerate(ordonnance_data.get('prescriptions', [])):
+            # Drug name and DCI
             drug_name = f"{drug.get('nom_commercial', 'N/A')} ({drug.get('dci', 'N/A')})"
-            elements.append(Paragraph(f"<b>{drug_name}</b>", styles['Heading4']))
+            elements.append(Paragraph(f"<b>{drug_name}</b>", content_style))
             
             # Details
             posologie = drug.get('posologie', {})
             details = f"""
-            <b>Dosage:</b> {drug.get('dosage', 'N/A')}<br/>
-            <b>Posologie:</b> {posologie.get('dose', 'N/A')} {posologie.get('frequence', '')}<br/>
-            <b>Durée:</b> {posologie.get('duree', 'N/A')}<br/>
-            <b>Instructions:</b> {posologie.get('instructions', 'N/A')}<br/>
+Dosage: {drug.get('dosage', 'N/A')}<br/>
+Posologie: {posologie.get('dose', 'N/A')} {posologie.get('frequence', '')}<br/>
+Durée: {posologie.get('duree', 'N/A')}<br/>
+Instructions: {posologie.get('instructions', 'N/A')}
             """
-            elements.append(Paragraph(details, styles['Normal']))
-            elements.append(Spacer(1, 0.2*inch))
+            elements.append(Paragraph(details, content_style))
+            
+            if i < len(ordonnance_data.get('prescriptions', [])) - 1:
+                elements.append(Spacer(1, 0.15*inch))
         
         # Build PDF
         doc.build(elements)
@@ -219,9 +282,9 @@ with col2:
     else:
         st.error("❌ ReportLab Missing")
     if HAS_DEPS:
-        st.success("✓ Dépendances chargées")
+        st.success("✓ Scaleway Ready")
     else:
-        st.warning("⚠️ Mode démo (simulé)")
+        st.warning("⚠️ Mode démo")
 
 st.divider()
 
@@ -233,8 +296,8 @@ with st.sidebar:
     st.header("⚙️ Configuration")
     
     st.subheader("Modèle STT")
-    st.info("**Faster-Whisper** - Rapide et précis pour le français")
-    stt_model = "Faster-Whisper"
+    st.info("**Faster-Whisper** via Scaleway API - Optimisé pour le français")
+    stt_model = "Faster-Whisper (Scaleway)"
     
     st.subheader("Fournisseur LLM")
     llm_provider = st.radio(
@@ -327,99 +390,105 @@ with tab1:
 # ============================================================
 
 with tab2:
-    st.header("Transcription Automatique")
-    st.markdown("**Modèle:** Faster-Whisper - Optimisé pour les consultations médicales en français")
+    st.header("Transcription Complète de l'Audio")
+    st.markdown("**Modèle:** Faster-Whisper via Scaleway - Transcription intégrale de la consultation")
     
     if st.session_state.audio_file is None:
         st.warning("⚠️ Charger d'abord un fichier audio (Tab 1)")
     else:
-        if st.button("🎤 Démarrer la transcription", key="btn_transcribe", use_container_width=True):
-            with st.spinner("Transcription avec Faster-Whisper..."):
+        if st.button("🎤 Transcriber l'audio complet", key="btn_transcribe", use_container_width=True):
+            with st.spinner("Transcription en cours via Scaleway..."):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
                 try:
+                    status_text.text("Sauvegarde du fichier temporaire...")
+                    progress_bar.progress(10)
+                    
+                    # Save temp file
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+                        tmp.write(st.session_state.audio_file.getbuffer())
+                        tmp_path = tmp.name
+                    
+                    status_text.text("Envoi à l'API Scaleway...")
+                    progress_bar.progress(30)
+                    
                     if HAS_DEPS:
                         # Real transcription with Scaleway
-                        status_text.text("Connexion à l'API Scaleway...")
-                        progress_bar.progress(25)
+                        transcription = transcribe_audio_scaleway(tmp_path)
                         
-                        stt_client = ScalewaySTT()
-                        
-                        # Save temp file
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
-                            tmp.write(st.session_state.audio_file.getbuffer())
-                            tmp_path = tmp.name
-                        
-                        status_text.text("Traitement en cours...")
-                        progress_bar.progress(75)
-                        
-                        result = stt_client.transcribe_file(tmp_path)
-                        
-                        # Extract text from result
-                        if isinstance(result, dict) and "text" in result:
-                            transcription = result["text"]
-                        else:
-                            transcription = str(result)
-                        
-                        # Cleanup
-                        Path(tmp_path).unlink()
-                    
+                        if transcription is None:
+                            st.error("❌ Erreur de transcription - vérifiez vos identifiants Scaleway")
+                            Path(tmp_path).unlink()
+                            st.stop()
                     else:
-                        # Demo mode - simulated transcription
-                        status_text.text("Chargement de la transcription...")
-                        progress_bar.progress(50)
-                        
+                        # Demo mode - simulated full transcription
+                        status_text.text("Mode démo - transcription simulée...")
                         import time
-                        time.sleep(2)
+                        time.sleep(3)
                         
                         transcription = """
-Consultation du 15 mai 2024.
+Consultation du 15 mai 2024, 14h30. Docteur Martin, cabinet ORL Paris 8ème.
 
-Je vois ce jour Madame Dupont Marie pour le suivi de sa polypose nasosinusienne.
+Bonjour Madame Dupont, je vois que vous êtes venue pour le suivi de votre polypose nasale. Comment ça va depuis la dernière fois?
 
-Elle a bien suivi le traitement prescrit, à savoir lavages de nez quotidiens et NASONEX, 
-1 pulvérisation par narine matin et soir, ce qui l'a partiellement amélioré.
+Oui, alors franchement je ne suis pas trop contente. J'ai bien pris mes Nasonex comme vous m'aviez dit, matin et soir, et j'ai aussi continué les lavages de nez tous les jours. Mais voilà, je n'arrive toujours pas à bien sentir, c'est très handicapant surtout au travail. Et puis mon nez est toujours bouché, particulièrement la nuit.
 
-Elle conserve cependant une anosmie marquée et une obstruction nasale bilatérale.
-La rhinorrhée s'est en revanche bien améliorée.
+D'accord. Et pour l'écoulement nasal que vous aviez? C'est mieux?
 
-Elle a bénéficié d'une cure de SOLUPRED dans l'intervalle, que je souhaite limiter.
+Oui ça c'est amélioré, franchement c'était plus important avant. Mais là j'ai plutôt des croûtes maintenant.
 
-À l'endoscopie nasale, je retrouve une polypose de grade 3 bilatérale, 
-pas de pus aux méats, cavum libre.
+Vous aviez pris un Solupred entre les deux consultations, c'est ça?
 
-En conclusion, je propose à la patiente d'augmenter le NASONEX à 2 pulvérisations 
-par narine matin et soir, et je l'incite à limiter au maximum la corticothérapie per os,
-d'autant qu'elle est suivie pour un diabète de type 2.
+Oui voilà, vous me l'aviez prescrit y a environ deux mois je crois. Ça m'a aidée un peu mais pas longtemps. Et puis je me disais avec mon diabète et tout ça, j'aimerais bien éviter d'en reprendre si possible.
 
-Je la reverrai dans 3 mois pour réévaluation.
+C'est une très bonne observation. Effectivement avec votre antécédent de diabète, il vaut mieux minimiser la corticothérapie générale. Bon, je vais vous faire un examen nasale rapidement pour voir l'évolution. Allez-y, penchez la tête en arrière légèrement s'il vous plaît.
+
+Voilà. Alors à l'examen, je vois une polypose bilatérale, on dirait du grade 3. Il n'y a pas de pus, cavum est bien libre, c'est une bonne chose. L'absence de purulence, c'est rassurant. Pas de fièvre de votre côté, aucune douleur intolérable?
+
+Non non, c'est juste l'anosmie qui m'embête vraiment.
+
+Bon, ce que je vous propose, c'est d'augmenter le Nasonex à deux pulvérisations par narine matin et soir au lieu d'une. On va aussi continuer les lavages, très important ça. Et pour le Solupred, on va essayer d'en rester sans en ce moment. Si jamais ça s'aggrave ou que vous avez des signes d'aggravation vous m'appelez directement. 
+
+Mais pour l'anosmie, c'est pas terrible. Est-ce qu'il y a des traitements?
+
+L'anosmie malheureusement elle est liée à la polypose elle-même qui obstrue le neuroépithélium. Avec le traitement qu'on va faire, on espère améliorer progressivement. Mais vous savez que c'est pas toujours réversible. Bon, on va vous revoir dans trois mois pour réévaluer. Et si jamais dans les trois mois vous avez une aggravation des symptômes, des difficultés respiratoires importantes, une fièvre, vous n'hésitez pas, vous venez directement me voir ou vous allez aux urgences. D'accord?
+
+Oui d'accord. Bon je suis contente que vous m'augmentiez le Nasonex, j'espère que ça va vraiment aider. Merci docteur.
+
+De rien. Je vais vous faire l'ordonnance et vous la donnez directement à la pharmacie. À dans trois mois!
                         """
-                        progress_bar.progress(100)
+                        progress_bar.progress(90)
+                    
+                    # Cleanup
+                    Path(tmp_path).unlink()
                     
                     st.session_state.transcription = transcription
                     st.session_state.transcription_editable = transcription
                     status_text.empty()
-                    progress_bar.empty()
+                    progress_bar.progress(100)
                     
                     st.success("✓ Transcription terminée")
                     
-                    with st.expander("📝 Voir et éditer la transcription complète", expanded=True):
-                        edited_transcription = st.text_area(
-                            "Texte de la transcription (modifiable):",
-                            transcription,
-                            height=300,
-                            label_visibility="collapsed"
-                        )
-                        st.session_state.transcription_editable = edited_transcription
-                    
-                    st.info(f"📊 Longueur: {len(transcription.split())} mots")
-                    st.tip("💡 Vous pouvez éditer la transcription ci-dessus en cas d'erreur de reconnaissance vocale")
-                
                 except Exception as e:
-                    st.error(f"❌ Erreur de transcription: {str(e)}")
+                    st.error(f"❌ Erreur: {str(e)}")
         
         if st.session_state.transcription:
+            st.divider()
+            
+            with st.expander("📝 Voir et éditer la transcription complète", expanded=True):
+                st.markdown("**Vous pouvez éditer cette transcription si vous détectez des erreurs de reconnaissance vocale:**")
+                edited_transcription = st.text_area(
+                    "Texte complet de la consultation:",
+                    st.session_state.transcription,
+                    height=400,
+                    label_visibility="collapsed"
+                )
+                st.session_state.transcription_editable = edited_transcription
+            
+            st.info(f"📊 Longueur: {len(st.session_state.transcription.split())} mots")
+            st.tip("💡 Éditez la transcription ci-dessus en cas d'erreur de reconnaissance vocale")
+            
             st.divider()
             st.markdown("**Suivant:** Extraire les données de consultation (Tab 3)")
 
@@ -454,9 +523,9 @@ with tab3:
                         
                         consultation = {
                             "motif_de_consultation": "Suivi de la polypose nasosinusienne — persistance de l'anosmie et obstruction nasale malgré le traitement",
-                            "interrogatoire": "Amélioration partielle du traitement (diminution rhinorrhée). Anosmie marquée persistante. Obstruction nasale bilatérale. Cure de Solupred réalisée dans l'intervalle.",
-                            "examen_clinique": "Endoscopie nasale: polypose bilatérale de grade 3. Absence de pus aux méats. Cavum libre.",
-                            "proposition_therapeutique": "Augmentation du Nasonex à 2 pulvérisations par narine matin et soir. Limitation stricte de la corticothérapie per os en raison du diabète associé. Réévaluation à 3 mois."
+                            "interrogatoire": "Amélioration partielle du traitement (diminution de la rhinorrhée). Anosmie marquée persistante très handicapante. Obstruction nasale bilatérale, particulièrement nocturne. Croûtes nasales. Cure de Solupred réalisée il y a deux mois.",
+                            "examen_clinique": "Endoscopie nasale: polypose bilatérale de grade 3. Absence de purulence. Cavum libre. Pas d'autres signes pathologiques.",
+                            "proposition_therapeutique": "Augmentation du Nasonex à 2 pulvérisations par narine matin et soir. Poursuite des lavages nasaux quotidiens. Arrêt de la corticothérapie générale en raison de l'antécédent diabétique. Réévaluation dans 3 mois. Consultation urgente si aggravation respiratoire, fièvre ou difficulté importante."
                         }
                     
                     st.session_state.consultation = consultation
