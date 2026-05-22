@@ -50,7 +50,6 @@ tqdm>=4.66.0
 # ── Web / Demo ────────────────────────────────────────────────────────────
 streamlit>=1.31.0          # Streamlit web framework
 requests>=2.31.0           # HTTP requests
-reportlab>=4.0.0           # PDF generation - REQUIRED FOR PDF OUTPUT
 
 # ── Scaleway STT ───────────────────────────────────────────────────────────
 # (Already installed via requests, no additional deps needed)
