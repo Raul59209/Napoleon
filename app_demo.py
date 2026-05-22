@@ -71,6 +71,8 @@ if "audio_file" not in st.session_state:
     st.session_state.audio_file = None
 if "transcription" not in st.session_state:
     st.session_state.transcription = None
+if "transcription_editable" not in st.session_state:
+    st.session_state.transcription_editable = None
 if "consultation" not in st.session_state:
     st.session_state.consultation = None
 if "ordonnance" not in st.session_state:
@@ -101,7 +103,7 @@ def transcribe_audio_scaleway(audio_path):
 
 
 def generate_pdf_consultation(consultation_data):
-    """Generate consultation PDF with ReportLab"""
+    """Generate consultation PDF with ReportLab - WITHOUT full transcription"""
     if not HAS_REPORTLAB:
         st.error("ReportLab not installed. Install with: pip install reportlab")
         return None
@@ -463,8 +465,6 @@ De rien. Je vais vous faire l'ordonnance et vous la donnez directement à la pha
                     
                     st.success("✓ Transcription terminée")
                     
-<<<<<<< HEAD
-=======
                     with st.expander("📝 Voir la transcription complète", expanded=True):
                         st.text_area(
                             "Texte de la transcription:",
