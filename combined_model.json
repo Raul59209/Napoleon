@@ -1,0 +1,86 @@
+{
+  "consultation": {
+    "motif_consultation": "...",
+    "historique_medical": {
+      "antecedents": {
+        "medicaux": [],
+        "chirurgicaux": [],
+        "gynecologiques": [],
+        "familiaux": []
+      },
+      "mode_de_vie": {
+        "tabac": null,
+        "alcool": null,
+        "activite_physique": null,
+        "autre": null
+      },
+      "traitements_habituels": [
+        {
+          "nom_commercial": "...",
+          "molecule": "...",
+          "posologie": "..."
+        }
+      ],
+      "allergies": [],
+      "vaccins": []
+    },
+    "interrogatoire": {
+      "symptomes_generaux": [],
+      "symptomes_par_organe": [
+        {
+          "organe": "ORL",
+          "description": "...",
+          "date_debut": "...",
+          "evolution": "..."
+        }
+      ]
+    },
+    "examen_clinique": {
+      "constantes": {
+        "pression_arterielle": null,
+        "frequence_cardiaque": null,
+        "temperature": null
+      },
+      "examen_par_specialite": {}
+    },
+    "conclusion": {
+      "points_cles": [],
+      "diagnostic": "...",
+      "proposition_therapeutique": {
+        "medicaments": [],
+        "examens_complementaires": [],
+        "orientations": []
+      },
+      "prochaine_consultation": "..."
+    }
+  },
+  "ordonnance": {
+    "indication": "...",
+    "lignes": [
+      {
+        "nom_commercial": "...",
+        "dci": "...",
+        "dosage_unitaire": "...",
+        "forme_galenique": "...",
+        "voie_administration": "...",
+        "posologie": {
+          "quantite_par_prise": 2,
+          "unite_par_prise": "comprimé",
+          "horaires": ["matin", "soir"],
+          "duree_valeur": 3,
+          "duree_unite": "mois",
+          "instructions_complementaires": "..."
+        },
+        "quantite_a_delivrer": "...",
+        "renouvelable": true,
+        "nombre_renouvellements": 0
+      }
+    ],
+    "contexte_patient": {
+      "allergies_connues": [],
+      "insuffisance_renale": false,
+      "insuffisance_hepatique": false
+    },
+    "note_pour_pharmacien": "..."
+  }
+}

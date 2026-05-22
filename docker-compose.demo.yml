@@ -15,7 +15,7 @@ services:
       - ./transcriptions:/app/transcriptions
     environment:
       # Scaleway
-      SCALEWAY_API_KEY: ${SCALEWAY_API_KEY:-}
+      SCALEWAY_API_KEY: ${SCW_API_KEY:-}
       SCALEWAY_PROJECT_ID: ${SCALEWAY_PROJECT_ID:-}
       SCALEWAY_REGION: ${SCALEWAY_REGION:-fr-par}
       SCALEWAY_MODEL: ${SCALEWAY_MODEL:-whisper-large}
