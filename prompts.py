@@ -2,16 +2,83 @@
 # ============================================================
 # LLM Prompts — Extraction de documents médicaux
 # ============================================================
-# Three prompts, one per output type.
-# All prompts follow the methodology:
-#   1. Rôle
-#   2. Objectif
-#   3. Description (format, ton, règles)
-#   4. Exemples
-#
-# Usage:
-#   from prompts import PROMPT_CR, PROMPT_DPI, PROMPT_ORDONNANCE
-#   prompt = PROMPT_CR.format(transcription=transcript_text)
+# Four prompts:
+#   0. PROMPT_REVIEW     — vérifie et corrige la transcription brute
+#   1. PROMPT_CR         — génère le compte-rendu de consultation
+#   2. PROMPT_DPI        — génère le dossier patient informatisé
+#   3. PROMPT_ORDONNANCE — génère l'ordonnance (format Posos)
+
+
+# ============================================================
+# 0. REVIEW — Vérification et correction de la transcription
+# ============================================================
+
+PROMPT_REVIEW = """
+Tu es un assistant médical expert en terminologie médicale française et en pharmacologie.
+Tu travailles en support d'un médecin pour corriger les erreurs de transcription automatique (STT).
+
+## Objectif
+Tu reçois une transcription brute d'une consultation médicale produite par un modèle 
+de reconnaissance vocale. Ces modèles font parfois des erreurs phonétiques, notamment 
+sur les noms de médicaments, les termes anatomiques et les dosages.
+
+Ton rôle est de :
+1. Identifier les mots qui semblent être des erreurs STT (phonétiquement proches du bon terme)
+2. Proposer les corrections les plus probables
+3. Retourner la transcription corrigée ET la liste détaillée des corrections
+
+Tu ne dois PAS inventer des informations ni reformuler le sens médical.
+Tu ne corriges QUE ce qui semble être une erreur de transcription phonétique.
+
+## Types d'erreurs à détecter
+
+- **Médicaments déformés** : "atobastatine" → "atorvastatine", "pérendopril" → "périndopril"
+- **Termes anatomiques** : "narré" → "narine", "acouphètes" → "acouphènes"
+- **Termes médicaux** : "intestins familiaux" → "antécédents familiaux"
+- **Dosages incohérents** : un nombre mal retranscrit dans un contexte de dosage médical
+- **Mots inventés** : un mot inexistant en français médical mais phonétiquement proche d'un terme réel
+
+## Ce que tu NE corriges PAS
+- Les hésitations naturelles du médecin ou du patient (euh, donc, alors...)
+- Les phrases grammaticalement imparfaites mais médicalement claires
+- Le vocabulaire familier du patient pour décrire ses symptômes
+- Toute ambiguïté où tu n'es pas sûr à plus de 80% — dans ce cas, tu la signales sans corriger
+
+## Format de sortie
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises markdown.
+
+{{
+  "transcription_corrigee": "string — la transcription complète avec les corrections appliquées",
+  "corrections": [
+    {{
+      "original": "string — le mot ou groupe de mots dans la transcription originale",
+      "corrige": "string — la correction proposée",
+      "type": "string — medicament | anatomie | terminologie | dosage | autre",
+      "confiance": "haute | moyenne | faible",
+      "explication": "string — brève explication de l'erreur probable"
+    }}
+  ],
+  "alertes": [
+    {{
+      "texte": "string — passage ambigu ou potentiellement problématique",
+      "raison": "string — pourquoi ce passage mérite l'attention du médecin"
+    }}
+  ],
+  "resume": "string — résumé en une phrase de ce qui a été corrigé ou signalé"
+}}
+
+Si aucune erreur n'est détectée :
+{{
+  "transcription_corrigee": "<transcription originale inchangée>",
+  "corrections": [],
+  "alertes": [],
+  "resume": "Aucune erreur de transcription détectée. La transcription semble correcte."
+}}
+
+## Transcription à vérifier
+
+{transcription}
+""".strip()
 
 
 # ============================================================
@@ -30,7 +97,6 @@ mentionnées dans la transcription. Ne complète pas et n'invente pas d'informat
 
 ## Format de sortie
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises markdown.
-Le JSON doit suivre exactement cette structure :
 
 {{
   "motif_de_consultation": "string — raison principale de la visite",
@@ -116,16 +182,16 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans 
   "allergies": ["liste de strings ou tableau vide"],
   "interrogatoire": {{
     "symptomes_generaux": "string ou null",
-    "symptomes_par_organe": "string ou null" [
+    "symptomes_par_organe": [
       {{
         "organe": "string",
-        "symptomes": "string"
+        "description": "string",
         "date_debut": "string ou null",
         "evolution": "string ou null",
-        "traitements_testes": "string ou null"
+        "traitements_testes": ["liste de strings ou tableau vide"],
+        "examens_realises": ["liste de strings ou tableau vide"]
       }}
-    ],
-    "examens_realises": "string ou null"
+    ]
   }},
   "examen_clinique": {{
     "constantes": {{
@@ -182,32 +248,35 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans 
   "prescriptions": [
     {{
       "nom_commercial": "string — nom de marque en majuscules (ex: NASONEX)",
-      "dci": "string ou null — DCI en minuscules (ex: mométasone)",
+      "dci": "string ou null — DCI en minuscules (ex: mométasone furoate)",
       "forme_galenique": "string ou null — comprimé, gélule, solution, spray nasal, etc.",
-      "dosage": "string ou null — ex: 500 mg, 1 pulvérisation",
+      "dosage_unitaire": "string ou null — ex: 500 mg, 50 µg/dose",
       "voie_administration": "string ou null — ex: orale, nasale, intraveineuse, cutanée",
       "posologie": {{
-        "dose": "string — ex: 2 pulvérisations, 1 comprimé",
+        "quantite_par_prise": "string — ex: 2 pulvérisations, 1 comprimé",
         "frequence": "string — ex: matin et soir, toutes les 8 heures, 3 fois par jour",
-        "voie": "string ou null — ex: orale, nasale, intraveineuse, cutanée"
+        "frequence_par_jour": null,
+        "duree_valeur": null,
+        "duree_unite": "string ou null — jours, semaines, mois",
+        "instructions_complementaires": "string ou null"
       }},
-      "duree": "string ou null — ex: 7 jours, 3 mois, traitement de fond",
       "renouvellement": {{
         "autorise": false,
         "nombre_fois": null
       }},
-      "ald": false,
-      "instructions_complementaires": "string ou null — ex: ne pas dépasser X par jour, prendre pendant les repas"
+      "ald": false
     }}
-  ]
+  ],
+  "note_pour_pharmacien": "string ou null"
 }}
 
 ## Règles
 - Inclus uniquement les médicaments prescrits dans cette consultation
-- nom_commercial en MAJUSCULES, molecule en minuscules
+- nom_commercial en MAJUSCULES, dci en minuscules
 - Si le médecin augmente ou modifie une prescription existante, inclus la nouvelle prescription
 - ald = true uniquement si explicitement mentionné
 - renouvellement.autorise = true si "AR" ou "à renouveler" est mentionné
+- note_pour_pharmacien : inclure les pathologies contextuelles importantes (ex: diabète, allergie)
 
 ## Exemple
 
@@ -220,41 +289,40 @@ Résultat attendu :
   "prescriptions": [
     {{
       "nom_commercial": "CLAMOXYL",
-      "molecule": "amoxicilline",
+      "dci": "amoxicilline",
       "forme_galenique": "comprimé",
-      "dosage": "1 gramme",
+      "dosage_unitaire": "1 g",
+      "voie_administration": "orale",
       "posologie": {{
-        "dose": "1 gramme",
+        "quantite_par_prise": "1 comprimé",
         "frequence": "matin, midi et soir",
-        "voie": "orale"
+        "frequence_par_jour": 3,
+        "duree_valeur": 7,
+        "duree_unite": "jours",
+        "instructions_complementaires": null
       }},
-      "duree": "7 jours",
-      "renouvellement": {{
-        "autorise": false,
-        "nombre_fois": null
-      }},
-      "ald": false,
-      "instructions_complementaires": null
+      "renouvellement": {{"autorise": false, "nombre_fois": null}},
+      "ald": false
     }},
     {{
       "nom_commercial": "DOLIPRANE",
-      "molecule": "paracétamol",
+      "dci": "paracétamol",
       "forme_galenique": "sachet",
-      "dosage": "500 mg",
+      "dosage_unitaire": "500 mg",
+      "voie_administration": "orale",
       "posologie": {{
-        "dose": "2 sachets",
+        "quantite_par_prise": "2 sachets",
         "frequence": "toutes les 6 heures",
-        "voie": "orale"
+        "frequence_par_jour": 4,
+        "duree_valeur": 15,
+        "duree_unite": "jours",
+        "instructions_complementaires": null
       }},
-      "duree": "15 jours",
-      "renouvellement": {{
-        "autorise": true,
-        "nombre_fois": 1
-      }},
-      "ald": false,
-      "instructions_complementaires": null
+      "renouvellement": {{"autorise": true, "nombre_fois": 1}},
+      "ald": false
     }}
-  ]
+  ],
+  "note_pour_pharmacien": null
 }}
 
 ## Transcription à traiter
@@ -264,27 +332,31 @@ Résultat attendu :
 
 
 # ============================================================
-# HELPER — build full prompt for a given output type
+# HELPER
 # ============================================================
 
 PROMPTS = {
+    "review":              PROMPT_REVIEW,
     "consultation_report": PROMPT_CR,
     "medical_record":      PROMPT_DPI,
     "prescription":        PROMPT_ORDONNANCE,
 }
+
 
 def build_prompt(output_type: str, transcription: str) -> str:
     """
     Returns the full prompt string for a given output type.
 
     Args:
-        output_type: one of "consultation_report", "medical_record", "prescription"
+        output_type: one of "review", "consultation_report", "medical_record", "prescription"
         transcription: raw transcript text from STT
 
     Returns:
         Formatted prompt string ready to send to an LLM
     """
     if output_type not in PROMPTS:
-        raise ValueError(f"Unknown output type '{output_type}'. "
-                         f"Choose from: {list(PROMPTS.keys())}")
+        raise ValueError(
+            f"Unknown output type '{output_type}'. "
+            f"Choose from: {list(PROMPTS.keys())}"
+        )
     return PROMPTS[output_type].format(transcription=transcription)

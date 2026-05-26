@@ -1,801 +1,852 @@
-#!/usr/bin/env python3
 """
-Napoleon Demo App - Streamlit (FR)
-Pipeline complète: Audio → Transcription → Extraction → Rapport PDF
+app_demo.py — Napoleon Medical Pipeline Demo
+============================================
+Streamlit interface for the full pipeline:
+  Tab 1: Upload audio → transcribe with faster-whisper → hallucination check
+  Tab 2: LLM extraction → CR, DPI, ordonnance (Scaleway)
+  Tab 3: PDF generation + download
 
-Utilisation:
+Run:
+    pip install streamlit faster-whisper openai python-dotenv reportlab
     streamlit run app_demo.py
-
-Variables d'environnement requises:
-    OPENAI_API_KEY
-    SCALEWAY_API_KEY
-    SCALEWAY_PROJECT_ID
 """
 
-import streamlit as st
+import io
 import json
 import os
-from pathlib import Path
-from datetime import datetime
+import sys
 import tempfile
-from io import BytesIO
+import time
+from collections import Counter
+from pathlib import Path
 
-# Try to import PDF library
-try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib import colors
-    HAS_REPORTLAB = True
-except ImportError:
-    HAS_REPORTLAB = False
+import streamlit as st
+from dotenv import load_dotenv
 
-# Import our modules
-try:
-    from scaleway_stt import ScalewaySTT
-    from self_correcting_extractor import extract_with_self_correction
-    from prompts import build_prompt
-    HAS_DEPS = True
-except ImportError:
-    HAS_DEPS = False
+load_dotenv()
 
-# ============================================================
-# Streamlit Config
-# ============================================================
-
+# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Napoleon STT Démo",
-    page_icon="🏥",
+    page_title="Napoleon — Pipeline Médical",
+    page_icon="🩺",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed",
 )
 
-# Custom CSS
+# ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
-    <style>
-    .main {
-        padding: 0rem 0rem;
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'DM Sans', sans-serif;
     }
-    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        font-size: 1.2rem;
+
+    .main { background-color: #F7F6F2; }
+
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1100px;
     }
-    </style>
+
+    h1, h2, h3 {
+        font-family: 'DM Serif Display', serif;
+        color: #0D1B3E;
+    }
+
+    .napoleon-header {
+        background: linear-gradient(135deg, #0D1B3E 0%, #1a2f5e 100%);
+        border-radius: 16px;
+        padding: 2rem 2.5rem;
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .napoleon-header h1 {
+        color: white !important;
+        font-size: 2.2rem;
+        margin: 0;
+        font-family: 'DM Serif Display', serif;
+    }
+
+    .napoleon-header p {
+        color: #A0B4CC;
+        margin: 0.3rem 0 0 0;
+        font-size: 0.95rem;
+    }
+
+    .napoleon-badge {
+        background: #028090;
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .step-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid #E8E6E0;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .step-card h4 {
+        font-family: 'DM Serif Display', serif;
+        color: #0D1B3E;
+        margin-bottom: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .metric-row {
+        display: flex;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+
+    .metric-box {
+        background: #F0F9FF;
+        border: 1px solid #BAE6FD;
+        border-radius: 8px;
+        padding: 0.8rem 1.2rem;
+        flex: 1;
+        text-align: center;
+    }
+
+    .metric-box .value {
+        font-size: 1.6rem;
+        font-weight: 600;
+        color: #028090;
+        font-family: 'DM Serif Display', serif;
+    }
+
+    .metric-box .label {
+        font-size: 0.75rem;
+        color: #64748B;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .alert-ok {
+        background: #ECFDF5;
+        border: 1px solid #6EE7B7;
+        border-radius: 8px;
+        padding: 0.8rem 1.2rem;
+        color: #065F46;
+        font-weight: 500;
+    }
+
+    .alert-warn {
+        background: #FFF7ED;
+        border: 1px solid #FCD34D;
+        border-radius: 8px;
+        padding: 0.8rem 1.2rem;
+        color: #92400E;
+        font-weight: 500;
+    }
+
+    .alert-error {
+        background: #FEF2F2;
+        border: 1px solid #FCA5A5;
+        border-radius: 8px;
+        padding: 0.8rem 1.2rem;
+        color: #991B1B;
+        font-weight: 500;
+    }
+
+    .transcript-box {
+        background: #FAFAF8;
+        border: 1px solid #E8E6E0;
+        border-radius: 8px;
+        padding: 1.2rem;
+        font-size: 0.9rem;
+        line-height: 1.7;
+        color: #374151;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    .json-section {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #E8E6E0;
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+
+    .json-section-header {
+        background: #0D1B3E;
+        color: white;
+        padding: 0.8rem 1.2rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: white;
+        border-radius: 12px;
+        padding: 6px;
+        border: 1px solid #E8E6E0;
+        margin-bottom: 1.5rem;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 0.5rem 1.2rem;
+        font-weight: 500;
+        color: #64748B;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: #0D1B3E !important;
+        color: white !important;
+    }
+
+    .stButton > button {
+        background: #028090;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 600;
+        font-family: 'DM Sans', sans-serif;
+        transition: background 0.2s;
+    }
+
+    .stButton > button:hover {
+        background: #026070;
+    }
+
+    .stDownloadButton > button {
+        background: #0D1B3E;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+
+    div[data-testid="stFileUploader"] {
+        background: white;
+        border-radius: 12px;
+        border: 2px dashed #CBD5E1;
+        padding: 1rem;
+    }
+</style>
 """, unsafe_allow_html=True)
 
-# ============================================================
-# Session State Init
-# ============================================================
+# ── Header ────────────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="napoleon-header">
+    <div style="font-size:2.5rem">🩺</div>
+    <div>
+        <h1>Napoleon</h1>
+        <p>Pipeline de traitement audio médical — transcription, extraction, rapport</p>
+    </div>
+    <div style="margin-left:auto">
+        <span class="napoleon-badge">Demo</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-if "audio_file" not in st.session_state:
-    st.session_state.audio_file = None
-if "transcription" not in st.session_state:
-    st.session_state.transcription = None
-if "consultation" not in st.session_state:
-    st.session_state.consultation = None
-if "ordonnance" not in st.session_state:
-    st.session_state.ordonnance = None
-if "hallucinations" not in st.session_state:
-    st.session_state.hallucinations = []
-if "posos_validation" not in st.session_state:
-    st.session_state.posos_validation = None
+# ── Session state ─────────────────────────────────────────────────────────────
+if "transcript" not in st.session_state:
+    st.session_state.transcript = None
+if "hallucination_ok" not in st.session_state:
+    st.session_state.hallucination_ok = None
+if "review" not in st.session_state:
+    st.session_state.review = None
+if "extraction" not in st.session_state:
+    st.session_state.extraction = None
+if "audio_filename" not in st.session_state:
+    st.session_state.audio_filename = None
 
-# ============================================================
-# Helper Functions
-# ============================================================
 
-def transcribe_audio_scaleway(audio_path):
-    """Transcribe audio file using Scaleway STT API"""
+# ── Utilities ─────────────────────────────────────────────────────────────────
+
+def detect_hallucination(text: str) -> tuple[bool, str]:
+    """
+    Returns (is_hallucinating, reason).
+    Detects Whisper loop hallucinations by checking for repeated sentences.
+    """
+    if not text or len(text.strip()) < 10:
+        return True, "Transcription vide ou trop courte."
+
+    sentences = [s.strip() for s in text.replace("?", ".").replace("!", ".").split(".") if s.strip()]
+
+    if len(sentences) < 3:
+        return False, "OK"
+
+    counts = Counter(sentences)
+    most_common, freq = counts.most_common(1)[0]
+
+    if freq > 5:
+        return True, f"Boucle détectée : \"{most_common[:60]}...\" répété {freq} fois."
+
+    # Check repetition ratio — if 30%+ of sentences are identical
+    if freq / len(sentences) > 0.3 and freq > 3:
+        return True, f"Contenu répétitif suspect : \"{most_common[:60]}\" ({freq}/{len(sentences)} phrases identiques)."
+
+    # Check total length vs unique content
+    unique_chars = len(" ".join(set(sentences)))
+    total_chars = len(text)
+    if total_chars > 500 and unique_chars / total_chars < 0.15:
+        return True, "Ratio contenu unique/total très faible — hallucination probable."
+
+    return False, "Aucune boucle détectée."
+
+
+def transcribe_audio(audio_bytes: bytes, filename: str) -> tuple[str, float]:
+    """Transcribe audio using faster-whisper. Returns (text, rtf)."""
     try:
-        stt_client = ScalewaySTT()
-        result = stt_client.transcribe_file(audio_path)
-        
-        # Extract text from result
-        if isinstance(result, dict) and "text" in result:
-            return result["text"]
-        else:
-            return str(result)
-    except Exception as e:
-        st.error(f"❌ Erreur Scaleway: {str(e)}")
-        return None
+        from faster_whisper import WhisperModel
+    except ImportError:
+        st.error("faster-whisper non installé. `pip install faster-whisper`")
+        return None, -1
 
+    with tempfile.NamedTemporaryFile(suffix=Path(filename).suffix, delete=False) as tmp:
+        tmp.write(audio_bytes)
+        tmp_path = tmp.name
 
-def generate_pdf_consultation(consultation_data):
-    """Generate consultation PDF with ReportLab"""
-    if not HAS_REPORTLAB:
-        st.error("ReportLab not installed. Install with: pip install reportlab")
-        return None
-    
     try:
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-        elements = []
-        styles = getSampleStyleSheet()
-        
-        # Title
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=18,
-            textColor=colors.HexColor('#1f77b4'),
-            spaceAfter=30,
-            alignment=1,
-            fontName='Helvetica-Bold'
+        # Load model — try GPU first, fall back to CPU
+        try:
+            model = WhisperModel("large-v3", device="cuda", compute_type="float16")
+            device_used = "cuda/float16"
+        except Exception:
+            model = WhisperModel("large-v3", device="cpu", compute_type="int8")
+            device_used = "cpu/int8"
+
+        t0 = time.perf_counter()
+        segments_gen, info = model.transcribe(
+            tmp_path,
+            language="fr",
+            beam_size=5,
+            temperature=0.0,
+            vad_filter=True,
+            initial_prompt=(
+                "Transcription médicale en français. "
+                "Termes: mg, ml, narine, polypes, cortisone, Nasonex, "
+                "atorvastatine, périndopril, audiogramme, VPPB."
+            ),
         )
-        
-        elements.append(Paragraph("RAPPORT DE CONSULTATION MÉDICALE", title_style))
-        elements.append(Spacer(1, 0.3*inch))
-        
-        # Date
-        date_style = ParagraphStyle(
-            'DateStyle',
-            parent=styles['Normal'],
-            fontSize=11,
-            textColor=colors.HexColor('#333333')
-        )
-        elements.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%d/%m/%Y à %H:%M')}", date_style))
-        elements.append(Spacer(1, 0.2*inch))
-        
-        # Motif
-        section_style = ParagraphStyle(
-            'SectionStyle',
-            parent=styles['Heading3'],
-            fontSize=12,
-            textColor=colors.HexColor('#1f77b4'),
-            fontName='Helvetica-Bold',
-            spaceAfter=12
-        )
-        
-        elements.append(Paragraph("MOTIF DE CONSULTATION", section_style))
-        content_style = ParagraphStyle(
-            'ContentStyle',
-            parent=styles['Normal'],
-            fontSize=11,
-            alignment=4
-        )
-        elements.append(Paragraph(consultation_data.get('motif_de_consultation', 'N/A'), content_style))
-        elements.append(Spacer(1, 0.2*inch))
-        
-        # Interrogatoire
-        elements.append(Paragraph("INTERROGATOIRE", section_style))
-        elements.append(Paragraph(consultation_data.get('interrogatoire', 'N/A'), content_style))
-        elements.append(Spacer(1, 0.2*inch))
-        
-        # Examen Clinique
-        elements.append(Paragraph("EXAMEN CLINIQUE", section_style))
-        elements.append(Paragraph(consultation_data.get('examen_clinique', 'N/A'), content_style))
-        elements.append(Spacer(1, 0.2*inch))
-        
-        # Proposition Thérapeutique
-        elements.append(Paragraph("PROPOSITION THÉRAPEUTIQUE", section_style))
-        elements.append(Paragraph(consultation_data.get('proposition_therapeutique', 'N/A'), content_style))
-        
-        # Build PDF
-        doc.build(elements)
-        buffer.seek(0)
-        return buffer.getvalue()
-    
-    except Exception as e:
-        st.error(f"Erreur lors de la génération du PDF: {str(e)}")
-        return None
+        text = " ".join(seg.text.strip() for seg in segments_gen)
+        elapsed = time.perf_counter() - t0
+        duration = info.duration if hasattr(info, "duration") else -1
+        rtf = elapsed / duration if duration > 0 else -1
+
+        return text.strip(), rtf, device_used, duration
+
+    finally:
+        os.unlink(tmp_path)
 
 
-def generate_pdf_ordonnance(ordonnance_data):
-    """Generate ordonnance/prescription PDF with ReportLab"""
-    if not HAS_REPORTLAB:
-        st.error("ReportLab not installed. Install with: pip install reportlab")
-        return None
-    
+def call_llm(transcript: str, output_type: str) -> dict:
+    """Call Scaleway LLM for extraction."""
     try:
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-        elements = []
-        styles = getSampleStyleSheet()
-        
-        # Title
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=18,
-            textColor=colors.HexColor('#1f77b4'),
-            spaceAfter=30,
-            alignment=1,
-            fontName='Helvetica-Bold'
+        from openai import OpenAI
+        sys.path.insert(0, str(Path(__file__).parent))
+        from prompts import build_prompt
+    except ImportError as e:
+        return {"error": str(e)}
+
+    api_key = os.environ.get("SCW_API_KEY")
+    if not api_key:
+        return {"error": "SCW_API_KEY non définie dans .env"}
+
+    client = OpenAI(
+        base_url="https://api.scaleway.ai/v1",
+        api_key=api_key,
+    )
+
+    try:
+        prompt = build_prompt(output_type, transcript)
+        # Review needs more tokens — it returns the full corrected transcript
+        # plus all corrections. Other prompts are fine with 2000.
+        max_tokens = 4000 if output_type == "review" else 2000
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-instruct",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=max_tokens,
         )
-        
-        elements.append(Paragraph("ORDONNANCE MÉDICALE", title_style))
-        elements.append(Spacer(1, 0.3*inch))
-        
-        # Date
-        date_style = ParagraphStyle(
-            'DateStyle',
-            parent=styles['Normal'],
-            fontSize=11,
-            textColor=colors.HexColor('#333333')
-        )
-        elements.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%d/%m/%Y à %H:%M')}", date_style))
-        elements.append(Spacer(1, 0.3*inch))
-        
-        # Prescriptions
-        section_style = ParagraphStyle(
-            'SectionStyle',
-            parent=styles['Heading3'],
-            fontSize=12,
-            textColor=colors.HexColor('#1f77b4'),
-            fontName='Helvetica-Bold',
-            spaceAfter=12
-        )
-        
-        elements.append(Paragraph("PRESCRIPTIONS", section_style))
-        elements.append(Spacer(1, 0.1*inch))
-        
-        content_style = ParagraphStyle(
-            'ContentStyle',
-            parent=styles['Normal'],
-            fontSize=11,
-            alignment=4
-        )
-        
-        for i, drug in enumerate(ordonnance_data.get('prescriptions', [])):
-            # Drug name and DCI
-            drug_name = f"{drug.get('nom_commercial', 'N/A')} ({drug.get('dci', 'N/A')})"
-            elements.append(Paragraph(f"<b>{drug_name}</b>", content_style))
-            
-            # Details
-            posologie = drug.get('posologie', {})
-            details = f"""
-Dosage: {drug.get('dosage', 'N/A')}<br/>
-Posologie: {posologie.get('dose', 'N/A')} {posologie.get('frequence', '')}<br/>
-Durée: {posologie.get('duree', 'N/A')}<br/>
-Instructions: {posologie.get('instructions', 'N/A')}
-            """
-            elements.append(Paragraph(details, content_style))
-            
-            if i < len(ordonnance_data.get('prescriptions', [])) - 1:
-                elements.append(Spacer(1, 0.15*inch))
-        
-        # Build PDF
-        doc.build(elements)
-        buffer.seek(0)
-        return buffer.getvalue()
-    
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        return {"error": f"JSON invalide: {e}", "raw": raw[:500]}
     except Exception as e:
-        st.error(f"Erreur lors de la génération du PDF: {str(e)}")
+        return {"error": str(e)}
+
+
+def generate_pdf(extraction: dict, filename_stem: str) -> bytes:
+    """Generate PDF from extraction dict. Returns PDF bytes."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_LEFT
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    except ImportError:
         return None
 
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    story = []
+    styles = getSampleStyleSheet()
 
-# ============================================================
-# Header
-# ============================================================
+    header_style = ParagraphStyle("Header", parent=styles["Normal"],
+                                   fontSize=11, fontName="Helvetica-Bold")
+    normal_style = ParagraphStyle("Body", parent=styles["Normal"],
+                                   fontSize=10, alignment=TA_LEFT)
 
-col1, col2 = st.columns([3, 1])
-with col1:
-    st.title("🏥 Napoleon")
-    st.markdown("**Audio Médical → Rapport Structuré**")
-with col2:
-    st.markdown("")
-    st.markdown("")
-    if HAS_DEPS:
-        st.success("✓ Scaleway Ready")
-    else:
-        st.warning("⚠️ Mode démo")
+    def safe(obj, key, default=""):
+        if obj is None: return default
+        return obj.get(key, default) or default
 
-st.divider()
+    report = extraction.get("consultation_report", {})
+    record = extraction.get("medical_record", {})
+    prescription = extraction.get("prescription", {})
 
-# ============================================================
-# Sidebar Configuration
-# ============================================================
+    rows = []
 
-with st.sidebar:
-    st.header("⚙️ Configuration")
-    
-    st.subheader("Modèle STT")
-    st.info("**Faster-Whisper** via Scaleway API - Optimisé pour le français")
-    stt_model = "Faster-Whisper (Scaleway)"
-    
-    st.subheader("Fournisseur LLM")
-    llm_provider = st.radio(
-        "Choisir le LLM:",
-        ["OpenAI ChatGPT-4", "Claude 3 Opus", "Ollama (Local)"],
-        help="Pour la détection des hallucinations et correction"
-    )
-    
-    st.subheader("Options de traitement")
-    enable_hallucination_detection = st.checkbox(
-        "Activer la détection des hallucinations",
-        value=True,
-        help="Correction automatique des erreurs LLM"
-    )
-    
-    max_retries = st.slider(
-        "Nombre de tentatives max",
-        min_value=1,
-        max_value=5,
-        value=3,
-        help="Retentatives si hallucinations détectées"
-    )
-    
-    posos_validation = st.checkbox(
-        "Valider avec l'API Posos",
-        value=True,
-        help="Valider les médicaments contre la base Posos"
-    )
-    
-    st.divider()
-    
-    st.subheader("📊 Statut")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("STT", "Faster-Whisper")
-    with col2:
-        st.metric("LLM", llm_provider.split()[0])
+    # CR section
+    rows.append([Paragraph("<b>Compte-rendu de consultation</b>", header_style), ""])
+    for label, key in [
+        ("Motif", "motif_de_consultation"),
+        ("Interrogatoire", "interrogatoire"),
+        ("Examen clinique", "examen_clinique"),
+        ("Proposition thérapeutique", "proposition_therapeutique"),
+    ]:
+        val = safe(report, key)
+        if val:
+            rows.append([Paragraph(f"<b>{label}</b>", normal_style),
+                         Paragraph(str(val), normal_style)])
 
-# ============================================================
-# Main Tabs
-# ============================================================
+    # Antécédents
+    rows.append([Paragraph("<b>Antécédents</b>", header_style), ""])
+    antec = record.get("antecedents", {}) or {}
+    for label, key in [("Médicaux", "medicaux"), ("Chirurgicaux", "chirurgicaux"),
+                       ("Familiaux", "familiaux")]:
+        items = antec.get(key, [])
+        if items:
+            rows.append([Paragraph(f"<b>{label}</b>", normal_style),
+                         Paragraph(", ".join(items), normal_style)])
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "1️⃣ Charger Audio",
-    "2️⃣ Transcription",
-    "3️⃣ Consultation",
-    "4️⃣ Ordonnance",
-    "5️⃣ Rapports PDF"
+    # Traitements
+    trts = record.get("traitements_habituels", []) or []
+    if trts:
+        rows.append([Paragraph("<b>Traitements habituels</b>", header_style), ""])
+        for t in trts:
+            name = t.get("nom_commercial", "") or ""
+            pos = t.get("posologie", "") or ""
+            rows.append([Paragraph(f"<b>{name}</b>", normal_style),
+                         Paragraph(pos, normal_style)])
+
+    # Conclusion
+    conclusion = record.get("conclusion", {}) or {}
+    rows.append([Paragraph("<b>Conclusion</b>", header_style), ""])
+    for label, key in [("Diagnostic", "diagnostic"),
+                       ("Proposition thérapeutique", "proposition_therapeutique"),
+                       ("Prochaine consultation", "prochaine_consultation")]:
+        val = safe(conclusion, key)
+        if val:
+            rows.append([Paragraph(f"<b>{label}</b>", normal_style),
+                         Paragraph(str(val), normal_style)])
+
+    # Ordonnance
+    prescriptions = prescription.get("prescriptions", []) or []
+    if prescriptions:
+        rows.append([Paragraph("<b>Ordonnance</b>", header_style), ""])
+        for p in prescriptions:
+            name = p.get("nom_commercial", "") or p.get("dci", "")
+            pos = p.get("posologie", {}) or {}
+            dose = pos.get("dose", "") or ""
+            freq = pos.get("frequence", "") or ""
+            duree = p.get("duree", "") or ""
+            line = f"{dose} {freq}".strip()
+            if duree:
+                line += f" — {duree}"
+            rows.append([Paragraph(f"<b>{name}</b>", normal_style),
+                         Paragraph(line, normal_style)])
+
+    table = Table(rows, colWidths=[2*inch, 4.3*inch])
+    style_cmds = [
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E8E6E0")),
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#FAFAF8")]),
+    ]
+    for i, row in enumerate(rows):
+        if row[1] == "":
+            style_cmds.extend([
+                ("BACKGROUND", (0, i), (-1, i), colors.HexColor("#0D1B3E")),
+                ("TEXTCOLOR", (0, i), (-1, i), colors.white),
+                ("SPAN", (0, i), (-1, i)),
+            ])
+    table.setStyle(TableStyle(style_cmds))
+    story.append(table)
+    doc.build(story)
+    return buf.getvalue()
+
+
+# ── Tabs ──────────────────────────────────────────────────────────────────────
+tab1, tab2, tab3 = st.tabs([
+    "🎙️  Transcription",
+    "🧠  Extraction",
+    "📋  Rapport PDF",
 ])
 
-# ============================================================
-# TAB 1: Upload Audio
-# ============================================================
 
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 1 — Transcription
+# ════════════════════════════════════════════════════════════════════════════
 with tab1:
-    st.header("Charger un fichier audio")
-    st.markdown("Formats supportés: MP3, WAV, M4A, FLAC, OGG")
-    
-    audio_file = st.file_uploader(
-        "Choisir un fichier audio",
-        type=["mp3", "wav", "m4a", "flac", "ogg"],
-        help="Audio de consultation médicale (max 100MB)"
-    )
-    
-    if audio_file:
-        st.session_state.audio_file = audio_file
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Aperçu")
-            st.audio(audio_file)
-        
-        with col2:
-            st.subheader("Informations")
-            info_col1, info_col2 = st.columns(2)
-            with info_col1:
-                st.metric("Nom", audio_file.name)
-                st.metric("Taille", f"{audio_file.size / 1024 / 1024:.2f} MB")
-            with info_col2:
-                st.metric("Format", audio_file.type.split("/")[1].upper())
-                st.metric("Statut", "✓ Prêt")
-        
-        st.success("✓ Fichier audio chargé avec succès")
-    else:
-        st.info("👆 Charger un fichier audio pour commencer")
+    col1, col2 = st.columns([1, 1], gap="large")
 
-# ============================================================
-# TAB 2: Transcription
-# ============================================================
+    with col1:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.markdown("#### 1. Charger l'audio")
+        st.caption("Formats acceptés : .m4a, .wav, .mp3, .flac")
 
+        uploaded = st.file_uploader(
+            "Déposez votre fichier audio ici",
+            type=["m4a", "wav", "mp3", "flac", "ogg"],
+            label_visibility="collapsed"
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if uploaded:
+            st.audio(uploaded)
+            st.session_state.audio_filename = uploaded.name
+
+            st.markdown('<div class="step-card">', unsafe_allow_html=True)
+            st.markdown("#### 2. Transcrire")
+            st.caption("Modèle : faster-whisper large-v3 · Langue : français")
+
+            if st.button("▶  Lancer la transcription", use_container_width=True):
+                with st.spinner("Transcription en cours..."):
+                    audio_bytes = uploaded.read()
+                    result = transcribe_audio(audio_bytes, uploaded.name)
+
+                if result and result[0]:
+                    text, rtf, device, duration = result
+                    st.session_state.transcript = text
+                    st.session_state.hallucination_ok = None
+                    st.success("Transcription terminée ✓")
+
+                    # Metrics
+                    st.markdown(f"""
+                    <div class="metric-row">
+                        <div class="metric-box">
+                            <div class="value">{duration:.0f}s</div>
+                            <div class="label">Durée audio</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="value">{rtf:.2f}</div>
+                            <div class="label">RTF</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="value">{len(text.split())}</div>
+                            <div class="label">Mots</div>
+                        </div>
+                    </div>
+                    <p style="font-size:0.8rem;color:#94A3B8">Dispositif : {device}</p>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.error("La transcription a échoué.")
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    with col2:
+        if st.session_state.transcript:
+            # ── Step 3: Hallucination check ───────────────────────────
+            st.markdown('<div class="step-card">', unsafe_allow_html=True)
+            st.markdown("#### 3. Vérification anti-hallucination")
+
+            is_hallucinating, reason = detect_hallucination(st.session_state.transcript)
+            st.session_state.hallucination_ok = not is_hallucinating
+
+            if is_hallucinating:
+                st.markdown(f'<div class="alert-error">⚠️ <b>Hallucination détectée</b><br>{reason}<br><br>La transcription n\'est pas fiable. Veuillez réessayer ou vérifier manuellement.</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="alert-ok">✓ <b>Aucune hallucination détectée</b><br>{reason}</div>', unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # ── Step 4: LLM review ────────────────────────────────────
+            st.markdown('<div class="step-card">', unsafe_allow_html=True)
+            st.markdown("#### 4. Vérification médicale par l'IA")
+            st.caption("Le LLM vérifie les noms de médicaments, termes anatomiques et dosages")
+
+            if st.button("🔍  Vérifier avec Scaleway IA", use_container_width=True):
+                with st.spinner("Vérification en cours..."):
+                    review_result = call_llm(st.session_state.transcript, "review")
+
+                if "error" in review_result:
+                    st.error(f"Erreur : {review_result['error']}")
+                else:
+                    st.session_state.review = review_result
+                    corrections = review_result.get("corrections", [])
+                    alertes = review_result.get("alertes", [])
+
+                    if not corrections and not alertes:
+                        st.markdown('<div class="alert-ok">✓ <b>Transcription validée</b><br>' + review_result.get("resume", "") + '</div>', unsafe_allow_html=True)
+                    else:
+                        if corrections:
+                            st.markdown(f'<div class="alert-warn">✏️ <b>{len(corrections)} correction(s) proposée(s)</b> — {review_result.get("resume", "")}</div>', unsafe_allow_html=True)
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            for c in corrections:
+                                badge_color = {"haute": "#065F46", "moyenne": "#92400E", "faible": "#6B7280"}.get(c.get("confiance", ""), "#6B7280")
+                                st.markdown(f"""
+                                <div style="display:flex;align-items:center;gap:0.8rem;padding:0.5rem 0;border-bottom:1px solid #F0EEE8">
+                                    <span style="background:#FEF3C7;color:#92400E;padding:0.1rem 0.5rem;border-radius:4px;font-family:monospace;font-size:0.85rem;text-decoration:line-through">{c.get('original','')}</span>
+                                    <span style="color:#028090">→</span>
+                                    <span style="background:#ECFDF5;color:#065F46;padding:0.1rem 0.5rem;border-radius:4px;font-family:monospace;font-size:0.85rem;font-weight:600">{c.get('corrige','')}</span>
+                                    <span style="font-size:0.75rem;color:{badge_color};margin-left:auto">{c.get('confiance','').upper()} · {c.get('type','')}</span>
+                                </div>
+                                <p style="font-size:0.8rem;color:#64748B;margin:0.2rem 0 0.5rem 0">{c.get('explication','')}</p>
+                                """, unsafe_allow_html=True)
+
+                        if alertes:
+                            st.markdown(f'<div class="alert-warn">⚠️ <b>{len(alertes)} alerte(s)</b> à vérifier par le médecin</div>', unsafe_allow_html=True)
+                            for a in alertes:
+                                st.markdown(f"- **«{a.get('texte','')}»** — {a.get('raison','')}")
+
+                        # Apply corrections button
+                        corrected = review_result.get("transcription_corrigee", "")
+                        if corrected and corrected != st.session_state.transcript:
+                            if st.button("✅  Appliquer les corrections à la transcription"):
+                                st.session_state.transcript = corrected
+                                st.success("Corrections appliquées ✓")
+                                st.rerun()
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # ── Step 5: Editable transcript ───────────────────────────
+            st.markdown('<div class="step-card">', unsafe_allow_html=True)
+            st.markdown("#### 5. Transcription finale")
+            st.caption("Modifiez si nécessaire avant de passer à l'extraction")
+
+            edited = st.text_area(
+                "Transcription :",
+                value=st.session_state.transcript,
+                height=220,
+                label_visibility="collapsed"
+            )
+            if edited != st.session_state.transcript:
+                st.session_state.transcript = edited
+                st.caption("✏️ Modifiée manuellement")
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        else:
+            st.markdown("""
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;color:#94A3B8;text-align:center">
+                <div style="font-size:3rem">🎙️</div>
+                <p>Chargez un fichier audio et lancez la transcription</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 2 — Extraction LLM
+# ════════════════════════════════════════════════════════════════════════════
 with tab2:
-    st.header("Transcription Complète de l'Audio")
-    st.markdown("**Modèle:** Faster-Whisper via Scaleway - Transcription intégrale de la consultation")
-    
-    if st.session_state.audio_file is None:
-        st.warning("⚠️ Charger d'abord un fichier audio (Tab 1)")
+    if not st.session_state.transcript:
+        st.info("Complétez d'abord l'étape de transcription (onglet 1).")
     else:
-        if st.button("🎤 Transcriber l'audio complet", key="btn_transcribe", use_container_width=True):
-            with st.spinner("Transcription en cours via Scaleway..."):
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                try:
-                    status_text.text("Sauvegarde du fichier temporaire...")
-                    progress_bar.progress(10)
-                    
-                    # Save temp file
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
-                        tmp.write(st.session_state.audio_file.getbuffer())
-                        tmp_path = tmp.name
-                    
-                    status_text.text("Envoi à l'API Scaleway...")
-                    progress_bar.progress(30)
-                    
-                    if HAS_DEPS:
-                        # Real transcription with Scaleway
-                        transcription = transcribe_audio_scaleway(tmp_path)
-                        
-                        if transcription is None:
-                            st.error("❌ Erreur de transcription - vérifiez vos identifiants Scaleway")
-                            Path(tmp_path).unlink()
-                            st.stop()
-                    else:
-                        # Demo mode - simulated full transcription
-                        status_text.text("Mode démo - transcription simulée...")
-                        import time
-                        time.sleep(3)
-                        
-                        transcription = """
-Consultation du 15 mai 2024, 14h30. Docteur Martin, cabinet ORL Paris 8ème.
+        if st.session_state.hallucination_ok is False:
+            st.markdown('<div class="alert-warn">⚠️ Une hallucination a été détectée dans la transcription. Vérifiez et corrigez le texte avant l\'extraction.</div>', unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
 
-Bonjour Madame Dupont, je vois que vous êtes venue pour le suivi de votre polypose nasale. Comment ça va depuis la dernière fois?
+        col_left, col_right = st.columns([1, 2], gap="large")
 
-Oui, alors franchement je ne suis pas trop contente. J'ai bien pris mes Nasonex comme vous m'aviez dit, matin et soir, et j'ai aussi continué les lavages de nez tous les jours. Mais voilà, je n'arrive toujours pas à bien sentir, c'est très handicapant surtout au travail. Et puis mon nez est toujours bouché, particulièrement la nuit.
+        with col_left:
+            st.markdown('<div class="step-card">', unsafe_allow_html=True)
+            st.markdown("#### Extraction LLM")
+            st.caption("Modèle : llama-3.3-70b-instruct · Scaleway Generative APIs")
 
-D'accord. Et pour l'écoulement nasal que vous aviez? C'est mieux?
+            outputs_to_run = st.multiselect(
+                "Documents à générer",
+                options=["consultation_report", "medical_record", "prescription"],
+                default=["consultation_report", "medical_record", "prescription"],
+                format_func=lambda x: {
+                    "consultation_report": "📝 Compte-rendu",
+                    "medical_record": "🗂️ DPI",
+                    "prescription": "💊 Ordonnance"
+                }[x]
+            )
 
-Oui ça c'est amélioré, franchement c'était plus important avant. Mais là j'ai plutôt des croûtes maintenant.
+            if st.button("🧠  Lancer l'extraction", use_container_width=True):
+                if not outputs_to_run:
+                    st.warning("Sélectionnez au moins un document.")
+                else:
+                    extraction = {}
+                    progress = st.progress(0)
+                    status = st.empty()
 
-Vous aviez pris un Solupred entre les deux consultations, c'est ça?
-
-Oui voilà, vous me l'aviez prescrit y a environ deux mois je crois. Ça m'a aidée un peu mais pas longtemps. Et puis je me disais avec mon diabète et tout ça, j'aimerais bien éviter d'en reprendre si possible.
-
-C'est une très bonne observation. Effectivement avec votre antécédent de diabète, il vaut mieux minimiser la corticothérapie générale. Bon, je vais vous faire un examen nasale rapidement pour voir l'évolution. Allez-y, penchez la tête en arrière légèrement s'il vous plaît.
-
-Voilà. Alors à l'examen, je vois une polypose bilatérale, on dirait du grade 3. Il n'y a pas de pus, cavum est bien libre, c'est une bonne chose. L'absence de purulence, c'est rassurant. Pas de fièvre de votre côté, aucune douleur intolérable?
-
-Non non, c'est juste l'anosmie qui m'embête vraiment.
-
-Bon, ce que je vous propose, c'est d'augmenter le Nasonex à deux pulvérisations par narine matin et soir au lieu d'une. On va aussi continuer les lavages, très important ça. Et pour le Solupred, on va essayer d'en rester sans en ce moment. Si jamais ça s'aggrave ou que vous avez des signes d'aggravation vous m'appelez directement. 
-
-Mais pour l'anosmie, c'est pas terrible. Est-ce qu'il y a des traitements?
-
-L'anosmie malheureusement elle est liée à la polypose elle-même qui obstrue le neuroépithélium. Avec le traitement qu'on va faire, on espère améliorer progressivement. Mais vous savez que c'est pas toujours réversible. Bon, on va vous revoir dans trois mois pour réévaluer. Et si jamais dans les trois mois vous avez une aggravation des symptômes, des difficultés respiratoires importantes, une fièvre, vous n'hésitez pas, vous venez directement me voir ou vous allez aux urgences. D'accord?
-
-Oui d'accord. Bon je suis contente que vous m'augmentiez le Nasonex, j'espère que ça va vraiment aider. Merci docteur.
-
-De rien. Je vais vous faire l'ordonnance et vous la donnez directement à la pharmacie. À dans trois mois!
-                        """
-                        progress_bar.progress(90)
-                    
-                    # Cleanup
-                    Path(tmp_path).unlink()
-                    
-                    st.session_state.transcription = transcription
-                    status_text.empty()
-                    progress_bar.progress(100)
-                    
-                    st.success("✓ Transcription terminée")
-                    
-                    with st.expander("📝 Voir la transcription complète", expanded=True):
-                        st.text_area(
-                            "Texte de la transcription:",
-                            transcription,
-                            height=200,
-                            disabled=True,
-                            label_visibility="collapsed"
-                        )
-                    
-                    st.info(f"📊 Longueur: {len(transcription.split())} mots")
-                
->>>>>>> parent of 5b915be (Remove full transcription from PDF - keep editable transcription on website only)
-                except Exception as e:
-                    st.error(f"❌ Erreur: {str(e)}")
-        
-        if st.session_state.transcription:
-            st.divider()
-            
-            with st.expander("📝 Voir et éditer la transcription complète", expanded=True):
-                st.markdown("**Vous pouvez éditer cette transcription si vous détectez des erreurs de reconnaissance vocale:**")
-                edited_transcription = st.text_area(
-                    "Texte complet de la consultation:",
-                    st.session_state.transcription,
-                    height=400,
-                    label_visibility="collapsed"
-                )
-                st.session_state.transcription_editable = edited_transcription
-            
-            st.info(f"📊 Longueur: {len(st.session_state.transcription.split())} mots")
-            st.tip("💡 Éditez la transcription ci-dessus en cas d'erreur de reconnaissance vocale")
-            
-            st.divider()
-            st.markdown("**Suivant:** Extraire les données de consultation (Tab 3)")
-
-# ============================================================
-# TAB 3: Extract Consultation
-# ============================================================
-
-with tab3:
-    st.header("Extraction des Données de Consultation")
-    
-    if st.session_state.transcription is None:
-        st.warning("⚠️ Terminer la transcription d'abord (Tab 2)")
-    else:
-        st.markdown(f"**LLM:** {llm_provider}")
-        
-        if st.button("📋 Extraire la consultation", key="btn_extract_consultation", use_container_width=True):
-            with st.spinner(f"Extraction avec {llm_provider}..."):
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                try:
-                    if HAS_DEPS and False:
-                        status_text.text("Appel à l'API LLM...")
-                        progress_bar.progress(50)
-                        prompt = build_prompt("consultation_report", st.session_state.transcription)
-                    
-                    else:
-                        status_text.text("Traitement avec LLM...")
-                        import time
-                        time.sleep(2)
-                        progress_bar.progress(100)
-                        
-                        consultation = {
-                            "motif_de_consultation": "Suivi de la polypose nasosinusienne — persistance de l'anosmie et obstruction nasale malgré le traitement",
-                            "interrogatoire": "Amélioration partielle du traitement (diminution de la rhinorrhée). Anosmie marquée persistante très handicapante. Obstruction nasale bilatérale, particulièrement nocturne. Croûtes nasales. Cure de Solupred réalisée il y a deux mois.",
-                            "examen_clinique": "Endoscopie nasale: polypose bilatérale de grade 3. Absence de purulence. Cavum libre. Pas d'autres signes pathologiques.",
-                            "proposition_therapeutique": "Augmentation du Nasonex à 2 pulvérisations par narine matin et soir. Poursuite des lavages nasaux quotidiens. Arrêt de la corticothérapie générale en raison de l'antécédent diabétique. Réévaluation dans 3 mois. Consultation urgente si aggravation respiratoire, fièvre ou difficulté importante."
+                    for i, output_type in enumerate(outputs_to_run):
+                        labels = {
+                            "consultation_report": "compte-rendu",
+                            "medical_record": "DPI",
+                            "prescription": "ordonnance"
                         }
-                    
-                    st.session_state.consultation = consultation
-                    status_text.empty()
-                    progress_bar.empty()
-                    
-                    st.success("✓ Consultation extraite")
-                    
-                    with st.expander("📄 Voir les données extraites", expanded=True):
-                        cols = st.columns(2)
-                        with cols[0]:
-                            st.subheader("Motif")
-                            st.write(consultation["motif_de_consultation"])
-                        with cols[1]:
-                            st.subheader("Proposition thérapeutique")
-                            st.write(consultation["proposition_therapeutique"])
-                        
-                        st.subheader("Interrogatoire")
-                        st.write(consultation["interrogatoire"])
-                        
-                        st.subheader("Examen clinique")
-                        st.write(consultation["examen_clinique"])
-                    
-                    with st.expander("🔍 Vue JSON"):
-                        st.json(consultation)
-                
-                except Exception as e:
-                    st.error(f"❌ Erreur d'extraction: {str(e)}")
-        
-        if st.session_state.consultation:
-            st.divider()
-            st.markdown("**Suivant:** Extraire les prescriptions (Tab 4)")
+                        status.caption(f"Extraction du {labels[output_type]}...")
+                        extraction[output_type] = call_llm(st.session_state.transcript, output_type)
+                        progress.progress((i + 1) / len(outputs_to_run))
 
-# ============================================================
-# TAB 4: Extract Ordonnance
-# ============================================================
+                    st.session_state.extraction = extraction
+                    status.empty()
+                    progress.empty()
 
-with tab4:
-    st.header("Extraction et Validation des Prescriptions")
-    
-    if st.session_state.transcription is None:
-        st.warning("⚠️ Terminer la transcription d'abord (Tab 2)")
+                    errors = [k for k, v in extraction.items() if "error" in v]
+                    if errors:
+                        st.error(f"Erreurs sur : {', '.join(errors)}")
+                    else:
+                        st.success("Extraction terminée ✓")
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # Download raw JSON
+            if st.session_state.extraction:
+                st.download_button(
+                    "⬇  Télécharger JSON brut",
+                    data=json.dumps(st.session_state.extraction, ensure_ascii=False, indent=2),
+                    file_name=f"extraction_{Path(st.session_state.audio_filename or 'consultation').stem}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+
+        with col_right:
+            if st.session_state.extraction:
+                icons = {
+                    "consultation_report": "📝",
+                    "medical_record": "🗂️",
+                    "prescription": "💊"
+                }
+                labels = {
+                    "consultation_report": "Compte-rendu",
+                    "medical_record": "DPI — Dossier patient",
+                    "prescription": "Ordonnance"
+                }
+
+                for key, data in st.session_state.extraction.items():
+                    st.markdown(f"""
+                    <div class="json-section">
+                        <div class="json-section-header">
+                            {icons.get(key, "📄")} {labels.get(key, key)}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    if "error" in data:
+                        st.error(f"Erreur : {data['error']}")
+                    else:
+                        with st.expander("Voir le JSON", expanded=True):
+                            st.json(data)
+            else:
+                st.markdown("""
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;color:#94A3B8;text-align:center">
+                    <div style="font-size:3rem">🧠</div>
+                    <p>Lancez l'extraction pour voir les résultats ici</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 3 — PDF
+# ════════════════════════════════════════════════════════════════════════════
+with tab3:
+    if not st.session_state.extraction:
+        st.info("Complétez d'abord l'extraction LLM (onglet 2).")
     else:
-        st.markdown(f"**LLM:** {llm_provider}")
-        st.markdown(f"**Détection hallucinations:** {'✓ Activée' if enable_hallucination_detection else '✗ Désactivée'}")
-        st.markdown(f"**Validation Posos:** {'✓ Activée' if posos_validation else '✗ Désactivée'}")
-        
-        if st.button("💊 Extraire les prescriptions", key="btn_extract_ordonnance", use_container_width=True):
-            with st.spinner(f"Extraction des prescriptions (max {max_retries} tentatives)..."):
-                progress_bar = st.progress(0)
-                status_container = st.container()
-                
-                try:
-                    import time
-                    
-                    status_container.text("Tentative d'extraction 1/3...")
-                    progress_bar.progress(33)
-                    time.sleep(1)
-                    
-                    ordonnance = {
-                        "prescriptions": [
-                            {
-                                "nom_commercial": "NASONEX",
-                                "dci": "mométasone furoate",
-                                "forme_galenique": "suspension pour pulvérisation nasale",
-                                "dosage": "50 µg/dose",
-                                "voie_administration": "nasale",
-                                "posologie": {
-                                    "dose": "2 pulvérisations",
-                                    "frequence": "matin et soir",
-                                    "voie": "nasale",
-                                    "duree": "3 mois",
-                                    "instructions": "Réaliser après lavage de nez. Bien agiter le flacon."
-                                },
-                                "quantite_a_delivrer": "Quantité suffisante pour 3 mois",
-                                "renouvelable": True,
-                                "nombre_renouvellements": 2,
-                                "posos_validated": True,
-                                "posos_data": {
-                                    "code": "NASONEX",
-                                    "label": "NASONEX",
-                                    "ingredients": ["mométasone"],
-                                    "cosine_similarity": 0.98,
-                                    "marketed": True
-                                }
-                            },
-                            {
-                                "nom_commercial": "Sérum physiologique",
-                                "dci": "chlorure de sodium 0,9%",
-                                "forme_galenique": "solution pour lavage nasal",
-                                "dosage": "0,9%",
-                                "voie_administration": "nasale",
-                                "posologie": {
-                                    "dose": "1 lavage de chaque narine",
-                                    "frequence": "matin et soir",
-                                    "voie": "nasale",
-                                    "duree": "3 mois",
-                                    "instructions": "À réaliser avant Nasonex"
-                                },
-                                "quantite_a_delivrer": "Quantité suffisante pour 3 mois",
-                                "renouvelable": True,
-                                "nombre_renouvellements": 2,
-                                "posos_validated": True,
-                                "posos_data": {
-                                    "code": "serum_physio",
-                                    "label": "Sérum physiologique",
-                                    "cosine_similarity": 0.99,
-                                    "marketed": True
-                                }
-                            }
-                        ]
-                    }
-                    
-                    time.sleep(1)
-                    progress_bar.progress(66)
-                    status_container.text("Validation avec API Posos...")
-                    
-                    time.sleep(1)
-                    progress_bar.progress(100)
-                    
-                    st.session_state.ordonnance = ordonnance
-                    st.session_state.posos_validation = {
-                        "total": len(ordonnance["prescriptions"]),
-                        "validated": len([p for p in ordonnance["prescriptions"] if p.get("posos_validated")]),
-                        "hallucinations_detected": 0
-                    }
-                    
-                    st.success("✓ Prescriptions extraites et validées")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric(
-                            "Hallucinations détectées",
-                            st.session_state.posos_validation["hallucinations_detected"],
-                            delta="✓ Propre" if st.session_state.posos_validation["hallucinations_detected"] == 0 else "⚠️ Trouvées"
-                        )
-                    with col2:
-                        st.metric(
-                            "Validées Posos",
-                            f"{st.session_state.posos_validation['validated']}/{st.session_state.posos_validation['total']}",
-                            delta="✓ 100%"
-                        )
-                    with col3:
-                        st.metric(
-                            "Tentatives",
-                            "1",
-                            delta="✓ Première tentative"
-                        )
-                    
-                    st.divider()
-                    
-                    st.subheader("📋 Prescriptions Extraites")
-                    
-                    for i, drug in enumerate(ordonnance["prescriptions"], 1):
-                        with st.expander(f"💊 {drug['nom_commercial']} ({drug['dosage']})", expanded=i==1):
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.markdown("**Informations du médicament**")
-                                st.write(f"**Nom commercial:** {drug['nom_commercial']}")
-                                st.write(f"**DCI:** {drug['dci']}")
-                                st.write(f"**Forme:** {drug['forme_galenique']}")
-                                st.write(f"**Voie:** {drug['voie_administration']}")
-                            
-                            with col2:
-                                st.markdown("**Posologie**")
-                                st.write(f"**Dose:** {drug['posologie']['dose']}")
-                                st.write(f"**Fréquence:** {drug['posologie']['frequence']}")
-                                st.write(f"**Durée:** {drug['posologie']['duree']}")
-                                st.write(f"**Instructions:** {drug['posologie']['instructions']}")
-                            
-                            st.markdown("**Validation**")
-                            if drug['posos_validated']:
-                                st.success(f"✓ Validé par Posos (similarité: {drug['posos_data']['cosine_similarity']:.2%})")
-                            else:
-                                st.warning("⚠️ Non validé")
-                    
-                    with st.expander("🔍 Vue JSON"):
-                        st.json(ordonnance)
-                
-                except Exception as e:
-                    st.error(f"❌ Erreur d'extraction: {str(e)}")
-        
-        if st.session_state.ordonnance:
-            st.divider()
-            st.markdown("**Suivant:** Générer les rapports PDF (Tab 5)")
+        col1, col2 = st.columns([1, 2], gap="large")
 
-# ============================================================
-# TAB 5: Generate Reports
-# ============================================================
-
-with tab5:
-    st.header("Générer les Rapports PDF")
-    
-    if st.session_state.consultation is None or st.session_state.ordonnance is None:
-        st.warning("⚠️ Compléter l'extraction d'abord (Tabs 3 & 4)")
-    else:
-        st.success("✓ Toutes les données prêtes pour la génération PDF")
-        
-        st.divider()
-        
-        col1, col2 = st.columns(2)
-        
         with col1:
-            st.subheader("📄 Rapport de Consultation")
-            
-            if st.button("Générer PDF Consultation", key="btn_pdf_consultation", use_container_width=True):
+            st.markdown('<div class="step-card">', unsafe_allow_html=True)
+            st.markdown("#### Générer le rapport PDF")
+            st.caption("Compte-rendu structuré prêt à être vérifié par le médecin")
+
+            filename_stem = Path(st.session_state.audio_filename or "consultation").stem
+
+            if st.button("📋  Générer le PDF", use_container_width=True):
                 with st.spinner("Génération du PDF..."):
-                    pdf_data = generate_pdf_consultation(st.session_state.consultation)
-                    
-                    if pdf_data:
-                        st.success("✓ PDF généré")
-                        st.download_button(
-                            label="⬇️ Télécharger Rapport de Consultation",
-                            data=pdf_data,
-                            file_name=f"consultation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-        
+                    pdf_bytes = generate_pdf(st.session_state.extraction, filename_stem)
+
+                if pdf_bytes:
+                    st.session_state.pdf_bytes = pdf_bytes
+                    st.success("PDF généré ✓")
+                else:
+                    st.error("Erreur de génération. `pip install reportlab`")
+
+            if "pdf_bytes" in st.session_state and st.session_state.pdf_bytes:
+                st.download_button(
+                    "⬇  Télécharger le PDF",
+                    data=st.session_state.pdf_bytes,
+                    file_name=f"rapport_{filename_stem}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
+
         with col2:
-            st.subheader("💊 Ordonnance Médicale")
-            
-            if st.button("Générer PDF Ordonnance", key="btn_pdf_ordonnance", use_container_width=True):
-                with st.spinner("Génération du PDF..."):
-                    pdf_data = generate_pdf_ordonnance(st.session_state.ordonnance)
-                    
-                    if pdf_data:
-                        st.success("✓ PDF généré")
-                        st.download_button(
-                            label="⬇️ Télécharger Ordonnance",
-                            data=pdf_data,
-                            file_name=f"ordonnance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-        
-        st.divider()
-        
-        st.subheader("📊 Résumé du Traitement")
-        
-        summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
-        
-        with summary_col1:
-            st.metric("Modèle STT", "Faster-Whisper")
-        with summary_col2:
-            st.metric("Fournisseur LLM", llm_provider.split()[0])
-        with summary_col3:
-            st.metric("Prescriptions", len(st.session_state.ordonnance["prescriptions"]))
-        with summary_col4:
-            st.metric("Validées Posos", f"{st.session_state.posos_validation['validated']}/{st.session_state.posos_validation['total']}")
-        
-        st.info("✓ Traitement terminé ! Tous les PDFs sont prêts à télécharger.")
+            st.markdown('<div class="step-card">', unsafe_allow_html=True)
+            st.markdown("#### Aperçu du contenu")
 
-# ============================================================
-# Footer
-# ============================================================
+            extraction = st.session_state.extraction
+            report = extraction.get("consultation_report", {}) or {}
+            record = extraction.get("medical_record", {}) or {}
+            conclusion = (record.get("conclusion") or {})
+            prescription = extraction.get("prescription", {}) or {}
 
-st.divider()
+            if report.get("motif_de_consultation"):
+                st.markdown(f"**Motif :** {report['motif_de_consultation']}")
 
-footer_col1, footer_col2, footer_col3 = st.columns(3)
+            if report.get("examen_clinique"):
+                st.markdown(f"**Examen clinique :** {report['examen_clinique']}")
 
-with footer_col1:
-    st.markdown("**Napoleon v0.1 Démo**")
-with footer_col2:
-    st.markdown(f"Dernière mise à jour: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-with footer_col3:
-    st.markdown("[GitHub](https://github.com/Raul59209/Napoleon) | [Docs](https://github.com/Raul59209/Napoleon/blob/main/README.md)")
+            if report.get("proposition_therapeutique"):
+                st.markdown(f"**Proposition thérapeutique :** {report['proposition_therapeutique']}")
+
+            if conclusion.get("diagnostic"):
+                st.markdown(f"**Diagnostic :** {conclusion['diagnostic']}")
+
+            if conclusion.get("prochaine_consultation"):
+                st.markdown(f"**Prochaine consultation :** {conclusion['prochaine_consultation']}")
+
+            prescriptions = prescription.get("prescriptions", []) or []
+            if prescriptions:
+                st.markdown("**Ordonnance :**")
+                for p in prescriptions:
+                    name = p.get("nom_commercial") or p.get("dci") or "—"
+                    pos = p.get("posologie", {}) or {}
+                    st.markdown(f"- **{name}** — {pos.get('dose','')} {pos.get('frequence','')}")
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+# ── Footer ────────────────────────────────────────────────────────────────────
+st.markdown("""
+<hr style="border:none;border-top:1px solid #E8E6E0;margin-top:3rem">
+<p style="text-align:center;color:#94A3B8;font-size:0.8rem">
+Napoleon · Pipeline médical IA · Données traitées localement · Confidentiel
+</p>
+""", unsafe_allow_html=True)
